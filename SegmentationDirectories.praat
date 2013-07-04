@@ -1,0 +1,5 @@
+audio_dir$      = "/media/bluelacy/patrick/Code/L2T-RWR-Segmentation/Testing/Audio"
+audioAnon_dir$  = "/media/bluelacy/patrick/Code/L2T-RWR-Segmentation/Testing/AudioAnonymizationLogs"
+segmentLog_dir$ = "/media/bluelacy/patrick/Code/L2T-RWR-Segmentation/Testing/SegmentationLogs"
+textGrid_dir$   = "/media/bluelacy/patrick/Code/L2T-RWR-Segmentation/Testing/SegmentationTextGrids"
+wordList_dir$   = "/media/bluelacy/patrick/Code/L2T-RWR-Segmentation/Testing/WordLists"
