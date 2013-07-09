@@ -287,13 +287,13 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
       # Determine which .wav (or .WAV) file in the 'audio_dir$'
       # directory corresponds to the experimental ID of the subject
       # presently being segmented.
-      Create Strings as file list... wavFile1 'audio_dir$'/*'experimental_ID$'.wav
+      Create Strings as file list... wavFile 'audio_dir$'/*'experimental_ID$'.wav
       if (macintosh or unix)
         Create Strings as file list... wavFile2 'audio_dir$'/*'experimental_ID$'.WAV
-        select Strings wavFile1
+        select Strings wavFile
         plus Strings wavFile2
         Append
-        select Strings wavFile1
+        select Strings wavFile
         plus Strings wavFile2
         Remove
         select Strings appended
