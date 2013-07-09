@@ -461,8 +461,16 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
           audioLog_filepath$ = "'audioAnon_dir$'/'audioLog_filename$'"
           audioLog_table$    = "'experimental_ID$'_AudioLog"
           # Create the audio-anonymization log as a Praat Table with
-          # 0 rows.
-          Create Table with column names... 'audioLog_table$' 0 'al_xmin$' 'al_xmax$'
+          # 1 row.  It needs to be guaranteed that the audio-anonymization
+          # log has at least 1 row; otherwise, there will be trouble
+          # if the segmenter tries to quit and resume without adding
+          # an interval that needs to be anonymized.  Initialize the
+          # audio-anonymization log with the interval [0, 0.01] muted.
+          Create Table with column names... 'audioLog_table$' 1 'al_xmin$' 'al_xmax$'
+          Select Table 'audioLog_table$'
+          Append row
+          Set numeric value... 1 'al_xmin$' 0
+          Set numeric value... 1 'al_xmax$' 0.01
           # [SEGMENTATION TEXTGRID]
           # Make string variables for the segmentation TextGrid's
           # basename, filename, and filepath on the local filesystem.
