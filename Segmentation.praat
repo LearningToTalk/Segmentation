@@ -468,7 +468,6 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
           # audio-anonymization log with the interval [0, 0.01] muted.
           Create Table with column names... 'audioLog_table$' 1 'al_xmin$' 'al_xmax$'
           Select Table 'audioLog_table$'
-          Append row
           Set numeric value... 1 'al_xmin$' 0
           Set numeric value... 1 'al_xmax$' 0.01
           # [SEGMENTATION TEXTGRID]
