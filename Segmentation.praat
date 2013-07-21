@@ -17,34 +17,8 @@
 #   wordList_dir$   (where Word List tables are saved)
 include SegmentationDirectories.praat
 
-# Task
-task$ = "RealWordRepetition: Segmentation"
-
-# Word List table columns
-wl_trial  = 1
-wl_trial$ = "TrialNumber"
-wl_abbr   = 2
-wl_abbr$  = "Abbreviation"
-wl_word   = 3
-wl_word$  = "Word"
-wl_wdbet  = 4
-wl_wdbet$ = "WorldBet"
-wl_cons   = 5
-wl_cons$  = "TargetC"
-wl_vowel  = 6
-wl_vowel$ = "TargetV"
-wl_frame  = 7
-wl_frame$ = "Frame"
-wl_type   = 8
-wl_type$  = "TrialType"
-wl_audio  = 9
-wl_audio$ = "AudioPrompt"
-wl_image  = 10
-wl_image$ = "PicturePrompt"
-wl_xmin   = 11
-wl_xmin$  = "PictureOnset"
-wl_xmax   = 12
-wl_xmax$  = "ITIOnset"
+# Praat procedure.
+procedure$ = "Segmentation"
 
 # Segmentation Log table columns
 sl_segmenter  = 1
@@ -94,6 +68,7 @@ tl_xmax$ = "XMax"
 
 # Name the nodes of the start-up procedure.
 startup_node_quit$     = "quit"
+startup_node_task$     = "task"
 startup_node_segment$  = "segment"
 startup_node_github$   = "github"
 startup_node_initials$ = "initials"
@@ -115,7 +90,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
   # [NODE]
   # Remind the segmenter to use the most recent version of the script.
   if startup_node$ == startup_node_github$
-    beginPause ("'task$'")
+    beginPause ("'procedure$'")
       comment ("Did you fetch the latest version of this script from GitHub before you began segmenting?")
     button = endPause ("No, I need to fetch the script from GitHub", "Yes, I'm using the current version", 2, 1)
     # Use the 'button' variable to determine which node to transition to next.
@@ -123,7 +98,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
       # If the segmenter is not using the most recent version of the 
       # segmentation script (ie. button = 1), direct them to GitHub 
       # (possibly by way of the Segmentation Handbook).
-      beginPause ("'task$'")
+      beginPause ("'procedure$'")
         comment ("Once you have fetched the latest version of the segmentation script from GitHub, restart Praat and run the script in a new Praat session.")
         comment ("You can consult the Segmentation Handbook for instructions on how to fetch from GitHub.")
       endPause ("Close this Segmentation session", 1, 1)
@@ -140,7 +115,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
   # [NODE]
   # Prompt the segmenter to enter their initials.
   elsif startup_node$ == startup_node_initials$
-    beginPause ("'task$'")
+    beginPause ("'procedure$'")
       comment ("Please enter your initials in the field below.")
       word    ("Your initials", "")
     button = endPause ("Back", "Quit", "Continue", 3, 1)
@@ -159,9 +134,47 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
     else
       # If the segmenter has entered their initials and wishes to
       # continue to the next step of the start-up procedure (button = 3),
-      # transition to the 'startup_node_experiment$' node so that they
-      # can choose the experimental ID of the subject whose audio
-      # recording they would like to segment.
+      # transition to the 'startup_node_task$' node so that they
+      # can choose the experimental task of the recording that they
+      # would like to segment.
+      startup_node$ = startup_node_task$
+    endif
+  
+  # [NODE]
+  # Prompt the segmenter to choose the type of experimental task
+  # during which the recording was made.
+  elsif startup_node$ == startup_node_task$
+    beginPause ("'procedure$'")
+      comment ("Please choose the experimental task of the recording that you would like to segment.")
+      optionMenu ("Task", 2)
+        option ("NonWordRep")
+        option ("RealWordRep")
+    button = endPause ("Back", "Quit", "Continue", 3, 1)
+    # Use the 'button' variable to determine which node to transition to next.
+    if button == 1
+      # If the segmenter chooses to go 'Back', then transition to the
+      # 'startup_node_initials$' node.
+      startup_node$ = startup_node_initials$
+    elsif button == 2
+      # If the segmenter chooses to 'Quit', then transition to the 
+      # 'startup_node_quit$' node.
+      startup_node$ = startup_node_quit$
+    elsif button == 3
+      # If the segmenter chooses to 'Continue', then use the value
+      # of the 'task$' variable to set other variables.
+      # Word List table columns
+      if task$ == "RealWordRep"
+        wl_trial  = 1
+        wl_trial$ = "TrialNumber"
+        wl_word   = 3
+        wl_word$  = "Word"
+      elsif task$ == "NonWordRep"
+        wl_trial  = 1
+        wl_trial$ = "TrialNumber"
+        wl_word   = 3
+        wl_word$  = "Orthography"
+      endif
+      # Then, transition to the 'startup_node_subject$' node.
       startup_node$ = startup_node_subject$
     endif
   
@@ -190,7 +203,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
     Sort
     # Open a dialog box and prompt the user to select the subject's
     # experimental ID from a drop-down menu.  
-    beginPause ("'task$'")
+    beginPause ("'procedure$'")
       comment ("Choose the subject's experimental ID from the menu below.")
       # Create the drop-down menu by looping through the Strings
       # object 'wavFiles'.
@@ -203,7 +216,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
         select Strings wavFiles
         # Get the n-th filename from the Strings object 'wavFiles'.
         wav_filename$ = Get string... n_file
-        # 'wav_filename$' has the form "RealWordRep_::SubjectID::.(wav|WAV)".
+        # 'wav_filename$' has the form "(RealWordRep|NonWordRep)_::SubjectID::.(wav|WAV)".
         # The extractWord$ function returns all characters to the right of the
         # first occurrence of '_', which in this case is the only occurrence
         # of '_'.
@@ -221,7 +234,11 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
         # tables, and so should not be available for segmentation
         # with this script.
         # These are subjects: 002L, 004L, 005L, 007L & 026L
-        if (subject_id$ != "002L") and (subject_id$ != "004L") and (subject_id$ != "005L") and (subject_id$ != "007L") and (subject_id$ != "026L")
+        if task$ == "RealWordRep"
+          if (subject_id$ != "002L") and (subject_id$ != "004L") and (subject_id$ != "005L") and (subject_id$ != "007L") and (subject_id$ != "026L")
+            option ("'exp_id$'")
+          endif
+        elsif task$ == "NonWordRep"
           option ("'exp_id$'")
         endif
       endfor
@@ -234,8 +251,8 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
     if button == 1
       # If the segmenter wishes to go to the previous step in the
       # start-up procedure (button = 1), then transition to the
-      # 'startup_node_initials$' node.
-      startup_node$ = startup_node_initials$
+      # 'startup_node_task$' node.
+      startup_node$ = startup_node_task$
     elsif button == 2
       # If the segmenter wishes to quit this segmentation session
       # prematurely (button = 2), then transition to the
@@ -266,7 +283,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
     # step in the start-up procedure (see the code block for the
     # 'startup_node_subject$' node above) and the 'wordList_dir$' 
     # variable that is imported from the '...Directories.praat' file.
-    wordList_basename$ = "RealWordRep_'experimental_ID$'_WordList"
+    wordList_basename$ = "'task$'_'experimental_ID$'_WordList"
     wordList_filename$ = "'wordList_basename$'.txt"
     wordList_filepath$ = "'wordList_dir$'/'wordList_filename$'"
     wordList_table$    = "'experimental_ID$'_WordList"
@@ -287,9 +304,9 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
       # Determine which .wav (or .WAV) file in the 'audio_dir$'
       # directory corresponds to the experimental ID of the subject
       # presently being segmented.
-      Create Strings as file list... wavFile 'audio_dir$'/*'experimental_ID$'.wav
+      Create Strings as file list... wavFile 'audio_dir$'/*'task$'_'experimental_ID$'.wav
       if (macintosh or unix)
-        Create Strings as file list... wavFile2 'audio_dir$'/*'experimental_ID$'.WAV
+        Create Strings as file list... wavFile2 'audio_dir$'/*'task$'_'experimental_ID$'.WAV
         select Strings wavFile
         plus Strings wavFile2
         Append
@@ -331,7 +348,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
         # step in the start-up procedure (see the code block for the
         # 'startup_node_subject$' node above) and the 'segmentLog_dir$' 
         # variable that is imported from the '...Directories.praat' file.
-        segmentLog_basename$ = "RealWordRep_'experimental_ID$'_'segmenters_initials$'segmentLog"
+        segmentLog_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'segmentLog"
         segmentLog_filename$ = "'segmentLog_basename$'.txt"
         segmentLog_filepath$ = "'segmentLog_dir$'/'segmentLog_filename$'"
         # Make a name for the segmentation log Praat Table.
@@ -358,7 +375,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
           # [AUDIO-ANONYMIZATION LOG]
           # Make string variables for the audio-anonymization log's
           # basename, filename, and filepath on the local filesystem.
-          audioLog_basename$ = "RealWordRep_'experimental_ID$'_AudioLog"
+          audioLog_basename$ = "'task$'_'experimental_ID$'_AudioLog"
           audioLog_filename$ = "'audioLog_basename$'.txt"
           audioLog_filepath$ = "'audioAnon_dir$'/'audioLog_filename$'"
           audioLog_table$    = "'experimental_ID$'_AudioLog"
@@ -388,7 +405,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
             # [SEGMENTATION TEXTGRID]
             # Make string variables for the segmentation TextGrid's
             # basename, filename, and filepath on the local filesystem.
-            textGrid_basename$ = "RealWordRep_'experimental_ID$'_'segmenters_initials$'segm"
+            textGrid_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'segm"
             textGrid_filename$ = "'textGrid_basename$'.TextGrid"
             textGrid_filepath$ = "'textGrid_dir$'/'textGrid_filename$'"
             textGrid_object$   = "'experimental_ID$'_Segmentation"
@@ -410,12 +427,12 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
               # If the segmentation TextGrid doesn't exist on the local
               # filesystem, first display an error message to the segmenter,
               # and then quit this segmentation session.
-              beginPause ("'task$'")
+              beginPause ("'procedure$'")
                 comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'."
                 comment ("But there doesn't seem to be a segmentation TextGrid for this subject on the local filesystem.")
                 comment ("Check that the following directory exists on the local filesystem:")
                 comment ("'textGrid_dir$'")
-                comment ("Also check that this directory contains a file named RealWordRep_'experimental_ID$'_'segmenters_initials$'segm.TextGrid"
+                comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_'segmenters_initials$'segm.TextGrid"
                 comment ("You may have to edit the textGrid_dir$ variable in the ...Directories.praat file before restarting this segmentation session.")
               endPause ("Quit segmenting & check filesystem", 1, 1)
               # Transition to the 'startup_node_quit$' node.
@@ -425,12 +442,12 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
             # If the audio-anonymization log doesn't exist on the local
             # filesystem, first display an error message to the segmenter,
             # and then quit this segmentation session.
-            beginPause ("'task$'")
+            beginPause ("'procedure$'")
               comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'."
               comment ("But there doesn't seem to be an audio-anonymization log for this subject on the local filesystem.")
               comment ("Check that the following directory exists on the local filesystem:")
               comment ("'audioAnon_dir$'")
-              comment ("Also check that this directory contains a file named RealWordRep_'experimental_ID$'_AudioLog.txt."
+              comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_AudioLog.txt."
               comment ("You may have to edit the audioAnon_dir$ variable in the ...Directories.praat file before restarting this segmentation session.")
             endPause ("Quit segmenting & check filesystem", 1, 1)
             # Transition to the 'startup_node_quit$' node.
@@ -456,7 +473,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
           # [AUDIO-ANONYMIZATION LOG]
           # Make string variables for the audio-anonymization log's
           # basename, filename, and filepath on the local filesystem.
-          audioLog_basename$ = "RealWordRep_'experimental_ID$'_AudioLog"
+          audioLog_basename$ = "'task$'_'experimental_ID$'_AudioLog"
           audioLog_filename$ = "'audioLog_basename$'.txt"
           audioLog_filepath$ = "'audioAnon_dir$'/'audioLog_filename$'"
           audioLog_table$    = "'experimental_ID$'_AudioLog"
@@ -473,7 +490,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
           # [SEGMENTATION TEXTGRID]
           # Make string variables for the segmentation TextGrid's
           # basename, filename, and filepath on the local filesystem.
-          textGrid_basename$ = "RealWordRep_'experimental_ID$'_'segmenters_initials$'segm"
+          textGrid_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'segm"
           textGrid_filename$ = "'textGrid_basename$'.TextGrid"
           textGrid_filepath$ = "'textGrid_dir$'/'textGrid_filename$'"
           textGrid_object$   = "'experimental_ID$'_Segmentation"
@@ -506,11 +523,11 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
         # then the script was unable to find a candidate .wav file.
         # Display an error message to the segmenter and then
         # quit this segmentation session.
-        beginPause ("'task$'")
+        beginPause ("'procedure$'")
           comment ("There doesn't seem to be an audio file for subject 'experimental_ID$' on the local filesystem.")
           comment ("Check that the following directory exists on the local filesystem:")
           comment ("'audio_dir$'")
-          comment ("Also check that this directory contains a wave file whose basename is RealWordRep_'experimental_ID$'.")
+          comment ("Also check that this directory contains a wave file whose basename is 'task$'_'experimental_ID$'.")
           comment ("You may have to edit the audio_dir$ variable in the ...Directories.praat file before restarting this segmentation session.")
         endPause ("Quit segmenting & check filesystem", 1, 1)
         # Transition to the 'startup_node_quit$' node.
@@ -520,11 +537,11 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
       # If there is no Word List table on the local filesystem,
       # first display an error message to the segmenter and then
       # quit this segmentation session.
-      beginPause ("'task$'")
+      beginPause ("'procedure$'")
         comment ("There doesn't seem to be a word list table for this subject on the local filesystem.")
         comment ("Check that the following directory exists on the local filesystem:")
         comment ("'wordList_dir$'")
-        comment ("Also check that this directory contains a word list table whose filename is RealWordRep_'experimental_ID$'_WordList.txt.")
+        comment ("Also check that this directory contains a word list table whose filename is 'task$'_'experimental_ID$'_WordList.txt.")
         comment ("You may have to edit the wordList_dir$ variable in the ...Directories.praat file before restarting this segmentation session.")
       endPause ("Quit segmenting & check filesystem", 1, 1)
       # Transition to the 'startup_node_quit$' node.
@@ -793,7 +810,7 @@ if (startup_node$ == startup_node_segment$)
     # had any rows added to it or not.
     select Table 'trial_segmentations_table$'
     n_segmentations = Get number of rows
-    beginPause ("'task$'")
+    beginPause ("'procedure$'")
       # Display the Trial Number and the Target Word of the current
       # trial.
       comment ("Current trial: 'trial_number$'")
@@ -874,7 +891,7 @@ if (startup_node$ == startup_node_segment$)
             endeditor
             # Prompt the segmenter to confirm the selection to be
             # segmented.
-            beginPause ("'task$'")
+            beginPause ("'procedure$'")
               # Display the Trial Number and the Target Word of the current
               # trial.
               comment ("Current trial: 'trial_number$'")
@@ -970,7 +987,7 @@ if (startup_node$ == startup_node_segment$)
             # intervals can be segmented, and prompt them to update 
             # the boundaries of the selection or go back to the 
             # top-level selection menu.
-            beginPause ("'task$'")
+            beginPause ("'procedure$'")
               comment ("You have only selected a point in the Editor window, but you must select an interval in order to add a segmentation.")
               comment ("To segment an interval of the audio recording, first highlight it in the Editor window, and then click 'Segment selection'.")
             segment_action = endPause ("", "Segment selection", "Back", 2, 1)
@@ -1039,7 +1056,7 @@ if (startup_node$ == startup_node_segment$)
             endeditor
             # Prompt the segmenter to confirm the selection to be
             # muted.
-            beginPause ("'task$'")
+            beginPause ("'procedure$'")
               comment ("If this is the interval of the recording that you would like to mute, click 'Mute selection'.")
               comment ("Otherwise, adjust the boundaries of the selection in the Editor window, and then click 'Update boundaries'.")
             mute_action = endPause ("", "Mute selection", "Update boundaries", "Back", 2, 1)
@@ -1086,7 +1103,7 @@ if (startup_node$ == startup_node_segment$)
             # intervals can be muted, and prompt them to update 
             # the boundaries of the selection or go back to the 
             # top-level selection menu.
-            beginPause ("'task$'")
+            beginPause ("'procedure$'")
               comment ("You're trying to mute a single point in the audio recording, rather than an interval.")
               comment ("To mute an interval of the audio recording, first highlight it in the Editor window, and then click 'Mute selection'.")
             mute_action = endPause ("", "Mute selection", "Back", 2, 1)
@@ -1189,7 +1206,7 @@ if (startup_node$ == startup_node_segment$)
           endeditor
           # Eleventh, prompt the user to confirm the segmentations
           # for the given trial.
-          beginPause ("'task$'")
+          beginPause ("'procedure$'")
             # Display the Trial Number and the Target Word of the current
             # trial.
             comment ("Current trial: 'trial_number$'")
@@ -1301,7 +1318,7 @@ if (startup_node$ == startup_node_segment$)
             anonymize_action = 0
             in_anonymizing_audio_end_loop = 1
             while (in_anonymizing_audio_end_loop)
-              beginPause ("'task$'")
+              beginPause ("'procedure$'")
                 comment ("You've finished segmenting all the trials in this audio recording.")
                 comment ("Please listen to the remaining portion of the audio file and mute any subject-identifying information.")
                 comment ("To mute an interval of the audio recording, first highlight it in the Editor window, and then click 'Mute selection'.")
@@ -1352,7 +1369,7 @@ if (startup_node$ == startup_node_segment$)
                     endeditor
                     # Prompt the segmenter to confirm the selection to be
                     # muted.
-                    beginPause ("'task$'")
+                    beginPause ("'procedure$'")
                       comment ("If this is the interval of the recording that you would like to mute, click 'Mute selection'.")
                       comment ("Otherwise, adjust the boundaries of the selection in the Editor window, and then click 'Update boundaries'.")
                     mute_action = endPause ("", "Mute selection", "Update boundaries", "Back", 2, 1)
@@ -1393,7 +1410,7 @@ if (startup_node$ == startup_node_segment$)
                     # intervals can be muted, and prompt them to update 
                     # the boundaries of the selection or go back to the 
                     # top-level selection menu.
-                    beginPause ("'task$'")
+                    beginPause ("'procedure$'")
                       comment ("You're trying to mute a single point in the audio recording, rather than an interval.")
                       comment ("To mute an interval of the audio recording, first highlight it in the Editor window, and then click 'Mute selection'.")
                     mute_action = endPause ("", "Mute selection", "Back", 2, 1)
@@ -1411,7 +1428,7 @@ if (startup_node$ == startup_node_segment$)
                 endwhile
               elsif anonymize_action == 3
                 # If the segmenter has 'Finished'...
-                beginPause ("'task$'")
+                beginPause ("'procedure$'")
                   comment ("You've finished everything for subject 'experimental_ID$'! Thank you for your hard work.")
                   comment ("To finalize all of your work, click 'Save and clear Praat objects'.")
                 endPause ("Save and clear Praat objects", "Back", 1, 1)
@@ -1450,7 +1467,7 @@ if (startup_node$ == startup_node_segment$)
           # [QUIT SEGMENTING]
           # If the segmenter chooses to 'Quit segmenting'
           quit_action = 0
-          beginPause ("'task$'")
+          beginPause ("'procedure$'")
             comment ("Thank you for your hard work during this segmentation session!")
             comment ("If you're sure that you would like to quit, click 'Save and clear Praat objects'.")
             comment ("If you accidently clicked 'Quit segmenting', click 'Back' to return to segmenting subject 'experimental_ID$'.")
