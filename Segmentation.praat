@@ -428,11 +428,11 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
               # filesystem, first display an error message to the segmenter,
               # and then quit this segmentation session.
               beginPause ("'procedure$'")
-                comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'."
+                comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'.")
                 comment ("But there doesn't seem to be a segmentation TextGrid for this subject on the local filesystem.")
                 comment ("Check that the following directory exists on the local filesystem:")
                 comment ("'textGrid_dir$'")
-                comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_'segmenters_initials$'segm.TextGrid"
+                comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_'segmenters_initials$'segm.TextGrid")
                 comment ("You may have to edit the textGrid_dir$ variable in the ...Directories.praat file before restarting this segmentation session.")
               endPause ("Quit segmenting & check filesystem", 1, 1)
               # Transition to the 'startup_node_quit$' node.
@@ -443,11 +443,11 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
             # filesystem, first display an error message to the segmenter,
             # and then quit this segmentation session.
             beginPause ("'procedure$'")
-              comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'."
+              comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'.")
               comment ("But there doesn't seem to be an audio-anonymization log for this subject on the local filesystem.")
               comment ("Check that the following directory exists on the local filesystem:")
               comment ("'audioAnon_dir$'")
-              comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_AudioLog.txt."
+              comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_AudioLog.txt.")
               comment ("You may have to edit the audioAnon_dir$ variable in the ...Directories.praat file before restarting this segmentation session.")
             endPause ("Quit segmenting & check filesystem", 1, 1)
             # Transition to the 'startup_node_quit$' node.
