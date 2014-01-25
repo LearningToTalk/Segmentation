@@ -47,6 +47,11 @@
 #			directory so that they are specific to the segmenter and won't be overwritten
 #			if more than one segmenter works on a file.
 
+# Author:		Mary E. Beckman
+# Date: 		January 25, 2014
+# Comment:	Changed specification of Experimental ID to be by entering 3-digit ID instead
+#			of by scrolling down through a pull-down menu.  
+
 #=========================================================#
 #  Global variables (other than those defined in startup section on basis of user input)             #
 #=========================================================#
@@ -245,71 +250,10 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 	# [NODE]   experimental participant's ID
 	# Prompt the segmenter to choose the subject's experimental ID.
 	elsif startup_node$ == startup_node_subject$
-		# Create a Strings object from the list of .wav files in the
-		# audio directory.  If the segmentation script is currently being
-		# run on a Macintosh or UNIX platform, then it is also necessary
-		# to append a list of all the .WAV files in the audio directory.
-		Create Strings as file list... wavFiles 'audio_dir$'/*.wav
-		if (macintosh or unix)
-			Create Strings as file list... files2 'audio_dir$'/*.WAV
-			select Strings wavFiles
-			plus Strings files2
-			Append
-			select Strings wavFiles
-			plus Strings files2
-			Remove
-			select Strings appended
-			Rename... wavFiles
-		endif
-		# The list of all the .wav (and .WAV) files in the audio directory
-		# has been created.  Now sort it alpha-numerically.
-		select Strings wavFiles
-		Sort
-		# Open a dialog box and prompt the user to select the subject's
-		# experimental ID from a drop-down menu.  
+		# Open a dialog box and prompt the user to specify the subject's 3-digit id no.
 		beginPause ("'procedure$' - Initializing session, step 5 (participant ID).")
-			comment ("Choose the subject's experimental ID from the menu below.")
-			# Create the drop-down menu by looping through the Strings
-			# object 'wavFiles'.
-			# Making a selection from this optionMenu creates the string
- 			# variable 'experimental_ID$'.
-			select Strings wavFiles
-			n_wav_files = Get number of strings
-			optionMenu ("Experimental ID", 1)
-				for n_file to n_wav_files
-					select Strings wavFiles
-					# Get the n-th filename from the Strings object 'wavFiles'.
-					wav_filename$ = Get string... n_file
- 					# 'wav_filename$' has the form "(RealWordRep|NonWordRep)_::SubjectID::.(wav|WAV)".
-					# The extractWord$ function returns all characters to the right of the
- 					# first occurrence of '_', which in this case is the only occurrence
-					# of '_'.
-					exp_id$ = extractWord$(wav_filename$, "_")
-					# The file extension (.wav or .WAV) is removed by calling the
-					# left$ function with a second argument equal to four characters
-					# less than the length of 'exp_id$'.
-					exp_id$ = left$(exp_id$, length(exp_id$) - 4)
-					# From the experimental ID, parse the subject ID, the ###X
-					# code at the beginning of the experimental ID.
-					subject_id$ = left$(exp_id$, 4)
-					# Use the 'subject_id$' variable to determine whether the
-					# 'exp_id$' should be displayed as a possible choice to 
- 					# segment.  Some subjects don't have associated word list
-					# tables, and so should not be available for segmentation
-					# with this script.
-					# These are subjects: 002L, 004L, 005L, 007L & 026L
- 					if task$ == "RealWordRep"
-  						if (subject_id$ != "002L") and (subject_id$ != "004L") and (subject_id$ != "005L") and (subject_id$ != "007L") and (subject_id$ != "026L")
-   							option ("'exp_id$'")
-  						endif
-   					elsif (task$ == "NonWordRep") | (task$ == "GFTA")
- 						option ("'exp_id$'")
-					endif
-				endfor
- 			# Once the optionMenu has been constructed, remove the Strings 
-			# object 'wavFiles' from the Praat object list,
-			select Strings wavFiles
-			Remove
+			comment ("Please enter the participant's 3-digit ID number in the field below.")
+  			word    ("id number", "")
 		button = endPause ("Back", "Quit", "Continue", 3, 1)
 		# Use the 'button' variable to determine which node to transition to next.
 		if button == 1
@@ -334,12 +278,54 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 	# Respectively load or create all of the data objects that are
 	# necessary to segment an audio file.
 	# These data objects include:
-	#   1. A word list table
-	#   2. An audio file
+	#   1. An audio file
+	#   2. A word list table
 	#   3. A segmentation log
 	#   4. An audio-anonymization log
 	#   5. A TextGrid
 	elsif startup_node$ == startup_node_segdata$
+
+		# [AUDIO FILE]
+		# Determine which .wav (or .WAV) file in the 'audio_dir$' directory has a filename
+		# that includes the id number of the subject presently being segmented.
+		Create Strings as file list... wavFile 'audio_dir$'/'task$'_'id_number$'*.wav
+		n_wavs = Get number of strings
+		# We check to see if the list is empty and if so, whether that's because we're on
+		# a Mac and there is a WAV file instead. 
+		if ('n_wavs' == 0) & (macintosh or unix)
+			select Strings wavFile
+			Remove
+			Create Strings as file list... wavFile 'audio_dir$'/'task$'_'id_number$'*.WAV
+			n_wavs = Get number of strings
+		endif
+		# The resulting Strings object 'wavFile' should list exactly one .wav (or .WAV) 
+		# filename that corresponds to the correct audio file for this subject.
+		if (n_wavs > 0)
+			# If the Strings object 'wavFile' has at least one filename,
+			# use the filename in this Strings object to make string
+			# variables for the filename, basename, and filepath of the
+			# audio file on the local filesystem.
+			select Strings wavFile
+			audio_filename$ = Get string... 1
+			audio_basename$ = left$(audio_filename$, length(audio_filename$) - 4)
+			audio_filepath$ = "'audio_dir$'/'audio_filename$'"
+			# Also make the corresponding experimental_ID$ variable that need later.
+			experimental_ID$ = mid$(audio_basename$, length(task$)+2, length(audio_basename$))
+			audio_sound$  = "'experimental_ID$'_Audio"
+			# Remove the Strings object from the Praat object list.
+			select Strings wavFile
+			Remove
+			# Read in the audio file, and rename it to the value of the
+			# 'audio_sound$' string variable.
+ 			Read from file... 'audio_filepath$'
+			select Sound 'audio_basename$'
+			Rename... 'audio_sound$'
+##		else ....
+##			# The code for what should happen if n_wavs is not greater than 0 ....
+##			# has to go at the very end of this while loop in order to avoid executing 
+##			# anything else, since the Praat scripting language doesn't seem to have 
+##			# the equivalent of the "next" jump back to the beginning of the loop. 
+##			# So the following section should be indented by 3 tabs rather than 2.
 
 		# [WORD LIST TABLE]
 		# Make string variables for the word list table's basename,
@@ -380,58 +366,9 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 			select Table 'wordList_table$'
 			n_trials = Get number of rows
 ##		else ....
-##			# The code for what should happen if wordList_exists is false at the end of 
-##			# has to go at the very end of this while loop in order to avoid executing 
-##			# anything else, since the Praat scripting language doesn't seem to have 
-##			# the equivalent of the "next" jump back to the beginning of the loop ... 
-
-##			# so this following section should be indented by 3 tabs rather than 2.
-		# [AUDIO FILE]
-		# Determine which .wav (or .WAV) file in the 'audio_dir$'
-		# directory corresponds to the experimental ID of the subject
-		# presently being segmented.
-		Create Strings as file list... wavFile 'audio_dir$'/*'task$'_'experimental_ID$'.wav
-		if (macintosh or unix)
-			Create Strings as file list... wavFile2 'audio_dir$'/*'task$'_'experimental_ID$'.WAV
-        		select Strings wavFile
-        		plus Strings wavFile2
-        		Append
-        		select Strings wavFile
-        		plus Strings wavFile2
-        		Remove
-        		select Strings appended
-        		Rename... wavFile
-		endif
-		# The resulting Strings object 'wavFile' should list a single
- 		# .wav (or .WAV) filename that corresponds to the correct
-		# audio file for this subject.
-		# Check whether the Strings object 'wavFile' includes at least
-		# one filename.
-		select Strings wavFile
-		n_wavs = Get number of strings
-		if (n_wavs > 0)
-			# If the Strings object 'wavFile' has at least one filename,
-			# use the filename in this Strings object to make string
-			# variables for the filename, basename, and filepath of the
-			# audio file on the local filesystem.
-			select Strings wavFile
-			audio_filename$ = Get string... 1
-			audio_basename$ = left$(audio_filename$, length(audio_filename$) - 4)
-			audio_filepath$ = "'audio_dir$'/'audio_filename$'"
-			audio_sound$  = "'experimental_ID$'_Audio"
-			# Remove the Strings object from the Praat object list.
-			select Strings wavFile
-			Remove
-			# Read in the audio file, and rename it to the value of the
-			# 'audio_sound$' string variable.
- 			Read from file... 'audio_filepath$'
-			select Sound 'audio_basename$'
-			Rename... 'audio_sound$'
-##		else ....
-##			# The code for what should happen if n_wavs is  0 has to be toward the 
-##			# end of this while loop (just before the else for if there is no wordList).
-##
-##				# so this following sections should be indented by 4 tabs rather than 3.
+##			# The code for what should happen if wordList_exists has to be toward the 
+##			# end of this while loop (just before the else for if n_wavs not greater than 0).
+##			# So this following section should be indented by 4 tabs rather than 3.
 
 		# [SEGMENTATION LOG]
 		# Make string variables for the segmentation log's basename,
@@ -494,7 +431,6 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
   				# [AUDIO-ANONYMIZATION LOG]
 				# Make string variables for the audio-anonymization log's
 				# basename, filename, and filepath on the local filesystem.
-#			audioLog_basename$ = "'task$'_'experimental_ID$'_AudioLog"
 				audioLog_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'audioLog"
 				audioLog_filename$ = "'audioLog_basename$'.txt"
  				audioLog_filepath$ = "'audioAnon_dir$'/'audioLog_filename$'"
@@ -528,9 +464,10 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
  					# and then quit this segmentation session.
 					beginPause ("'procedure$' - Initialization error 4. Cannot load audio log file.")
 						comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'.")
-						comment ("But there doesn't seem to be an audio-anonymization log for this subject on the local filesystem.")
+						comment ("But there doesn't seem to be an audio-anonymization log for this subject")
+						comment ("     on the local filesystem.")
 						comment ("Check that the following directory exists on the local filesystem:")
-  						comment ("'audioAnon_dir$'")
+  						comment ("   'audioAnon_dir$'")
 						comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_'segmenters_initials$'audioLog.txt." )
 					endPause ("Quit segmenting & check filesystem", 1, 1)
 					# Transition to the 'startup_node_quit$' node.
@@ -564,11 +501,11 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 					# and then quit this segmentation session.
 					beginPause ("'procedure$' - Initialization error 3. Cannot load segmentation log file.")
 						comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'."
-						comment ("But there doesn't seem to be a segmentation TextGrid for this subject on the local filesystem.")
+						comment ("But there doesn't seem to be a segmentation TextGrid for this subject")
+						comment ("     on the local filesystem.")
 						comment ("Check that the following directory exists on the local filesystem:")
-						comment ("'textGrid_dir$'")
+						comment ("   'textGrid_dir$'")
  						comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_'segmenters_initials$'segm.TextGrid"
-						comment ("You may have to edit the textGrid_dir$ variable in the ...Directories.praat file before restarting this segmentation session.")
  					endPause ("Quit segmenting & check filesystem", 1, 1)
 					# Transition to the 'startup_node_quit$' node.
      					startup_node$ = startup_node_quit$
@@ -597,7 +534,6 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 			# [AUDIO-ANONYMIZATION LOG]
 			# Make string variables for the audio-anonymization log's
 			# basename, filename, and filepath on the local filesystem.
-#			audioLog_basename$ = "'task$'_'experimental_ID$'_AudioLog"
 			audioLog_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'audioLog"
 			audioLog_filename$ = "'audioLog_basename$'.txt"
 			audioLog_filepath$ = "'audioAnon_dir$'/'audioLog_filename$'"
@@ -647,25 +583,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 			startup_node$ = startup_node_segment$
 		endif
 ##				# At least 4 tabs indenting would end after this. 
-##
-##		# [AUDIO FILE] section continues here ...
-  		else
-			# If the Strings object 'wavFile' has no filenames on it,
-			# then the script was unable to find a candidate .wav file.
-			# Display an error message to the segmenter and then
-			# quit this segmentation session.
-			beginPause ("'procedure$' - Initialization error 1. Cannot load audio file.")
-				comment ("There doesn't seem to be an audio file for subject 'experimental_ID$' on the local filesystem.")
-				comment ("Check that the following directory exists on the local filesystem:")
-				comment ("'audio_dir$'")
-				comment ("Also check that this directory contains a wave file whose basename is 'task$'_'experimental_ID$'.")
-				comment ("You may have to edit the audio_dir$ variable in the ...Directories.praat file before restarting this segmentation session.")
-			endPause ("Quit segmenting & check filesystem", 1, 1)
-			# Transition to the 'startup_node_quit$' node.
-			startup_node$ = startup_node_quit$
-		endif
-##			# At least 3 tabs indenting would end after this. 
-##
+
 ##		# [WORD LIST TABLE] section continues here ...
 		else
 			# If there is no Word List table on the local filesystem,
@@ -676,11 +594,29 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 				comment ("Check that the following directory exists on the local filesystem:")
 				comment ("'wordList_dir$'")
 				comment ("Also check that this directory contains a word list table whose filename is 'task$'_'experimental_ID$'_WordList.txt.")
-				comment ("You may have to edit the wordList_dir$ variable in the ...Directories.praat file before restarting this segmentation session.")
 			endPause ("Quit segmenting & check filesystem", 1, 1)
  			# Transition to the 'startup_node_quit$' node.
 			startup_node$ = startup_node_quit$
 		endif  
+##			# At least 3 tabs indenting would end after this. 
+
+##		# [AUDIO FILE] section continues here ...
+  		else
+			# If the Strings object 'wavFile' has no filenames on it,
+			# then the script was unable to find a candidate .wav file.
+			# Display an error message to the segmenter and then
+			# quit this segmentation session.
+			beginPause ("'procedure$' - Initialization error 1. Cannot load audio file.")
+				comment ("There doesn't seem to be an audio file for subject 'id_number$'")
+				comment ("   on the local filesystem.")
+				comment ("Check that the following directory exists on the local filesystem:")
+				comment ("'audio_dir$'")
+				comment ("Also check that this directory contains a wave file whose basename")
+				comment ("      begins with 'task$'_'id_number$'.")
+			endPause ("Quit segmenting & check filesystem", 1, 1)
+			# Transition to the 'startup_node_quit$' node.
+			startup_node$ = startup_node_quit$
+		endif
 	endif
 endwhile
 
