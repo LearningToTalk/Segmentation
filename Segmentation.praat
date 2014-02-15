@@ -52,6 +52,21 @@
 # Comment:	Changed specification of Experimental ID to be by entering 3-digit ID instead
 #			of by scrolling down through a pull-down menu.  
 
+# Author:		Mary E. Beckman
+# Date: 		February 11, 2014
+# Comment:	Separated specification of drive$ and audio_drive$ so that can segment
+#			on a Mac with VPN connection to UMN server for all files other than the
+#			audio files, which are loaded from a local directory. 
+
+# Author:		Mary E. Beckman
+# Date: 		February 15, 2014
+# Comment:	1) Finalized the list of standard notes after discussion in group on February  10
+#			and then changed the specification of the standard notes to be by checking all 
+#			that appy from a series of Boolean prompts in the dialogue box.
+#			2) Added an automatic generation of "stimulus" note for notes tier when the 
+#			"Perseveration" context label is chosen, which is inserted at start of segment.
+
+
 #=========================================================#
 #  Global variables (other than those defined in startup section on basis of user input)             #
 #=========================================================#
@@ -136,6 +151,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 				optionMenu ("Location", 1)
 				option ("WaismanLab")
 				option ("ShevlinHallLab")
+				option ("Mac via VPN")
 				option ("Other (Beckman)")
 				option ("Other (not Beckman)")
 		button = endPause ("Quit", "Continue", 2)
@@ -150,14 +166,20 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 			# then set the value of the segmenters_initials$ variable and ...
 			segmenters_initials$ = your_initials$
 			# use the value of the 'location$' variable to set up the drive$ variable.
-			if location$ == "WaismanLab"
-				drive$ = "L:/" 
-			elsif location$ == "ShevlinHallLab"
+			if (location$ == "WaismanLab")
+				drive$ = "L:/"
+				audio_drive$ = "L:/"
+			elsif (location$ == "ShevlinHallLab")
 				drive$ = "//l2t.cla.umn.edu/tier2/"
-			elsif location$ == "Other (Beckman)"				
-				drive$ = "/LearningToTalk/Tier2/"
-			elsif location$ == "Other (not Beckman)"	
-				exit Contact Benjamin Munson and Mary Beckman to request another location	
+				audio_drive$ = "//l2t.cla.umn.edu/tier2/"
+			elsif (location$ == "Mac via VPN")
+				drive$ = "/Volumes/tier2/"
+				audio_drive$ = "/Volumes/tier2onUSB/"
+			elsif (location$ == "Other (Beckman)")
+				drive$ = "/Volumes/tier2/"		
+				audio_drive$ = "/LearningToTalk/Tier2/"
+			elsif (location$ == "Other (not Beckman)")
+				exit Contact Mary Beckman and your segmentation guru to request another location
 			endif
 			# and then transition to the 'startup_node_testwave$' node so that the segmenter
 			# can choose the testwave (i.e., "TimePoint") of the data to be segmented.
@@ -214,7 +236,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 			# Shared drectories that will not be affected by the process of segmentation.
 
 			# The directory from where audio files are read.
-			audio_dir$ = drive$+"DataAnalysis/"+task$+"/"+testwave$+"/Recordings"
+			audio_dir$ = audio_drive$+"DataAnalysis/"+task$+"/"+testwave$+"/Recordings"
 
 			# The directory from where word list tables are read.
 			wordList_dir$ = drive$+"DataAnalysis/"+task$+"/"+testwave$+"/WordLists"
@@ -1008,15 +1030,21 @@ if (startup_node$ == startup_node_segment$)
 							option ("Perseveration")
 					endif
 					# Prompt the segmenter to choose a standard notes tier label, if appropriate.
-					comment ("(2) [optional] choose one of the following standard notes, if appropriate.") 
-			 		optionMenu ("Note", 1)
-						option ("")
-						option ("TOS")
-						option ("ONS")
-						option ("SOPR")
-						option ("FS")
-						option ("NI")
-##### [ACTION ITEM] 		# After discussion, add other standardized labels for types of noise ...
+#					comment ("(2) [optional] choose one of the following standard notes, if appropriate.") 
+#			 		optionMenu ("Note", 1)
+#						option ("")
+#						option ("next stimulus")
+#						option ("TOS")
+#						option ("noise")
+#						option ("fragment")
+#						option ("FS")
+#						option ("NI")
+					comment ("(2) [optional] mark any of the following standard notes, if appropriate.") 
+			 		boolean: "talking over stimulus", 0
+			 		boolean: "noise during response", 0
+			 		boolean: "fragment", 0
+			 		boolean: "false start", 0
+			 		boolean: "not initial", 0
 			 		comment ("(3) Then, click 'Segment selection'.")
 					comment ("     Note: If you would like to change the boundaries of the selection")
 					comment ("              before adding a Context label, do so in the Editor window,")
@@ -1055,12 +1083,51 @@ if (startup_node$ == startup_node_segment$)
 					context_label$ = "'context$''context_suffix$'"
 					select TextGrid 'textGrid_object$'
 					Set interval text... 'tg_context' 'context_interval' 'context_label$'
-					# Sixth, add the Note label to the SegmNotes tier.
+					# Sixth, build the note$ and add the Note label to the SegmNotes tier.
+					note$ = ""
+					num_notes = 0
+					if 'talking_over_stimulus'
+						note$ = note$+"TOS"
+						num_notes = 'num_notes' + 1
+					endif
+					if 'noise_during_response'
+						if (num_notes > 0)
+							note$ = note$ + "; "
+						endif
+						note$ = note$+"noise"
+						num_notes = 'num_notes' + 1
+					endif
+					if 'fragment'
+						if (num_notes > 0)
+							note$ = note$ + "; "
+						endif
+						note$ = note$+"fragment"
+						num_notes = 'num_notes' + 1
+					endif
+					if 'false_start'
+						if (num_notes > 0)
+							note$ = note$ + "; "
+						endif
+						note$ = note$+"FS"
+					endif
+					if 'not_initial'
+						if (num_notes > 0)
+							note$ = note$ + "; "
+						endif
+						note$ = note$+"NI"
+					endif
+					# Insert the (sequence of) standard note(s) in the middle of the segment. 
 					if note$ != ""
 						select TextGrid 'textGrid_object$'
 						Insert point... 'tg_notes' 'segment_selection_xmid' 'note$'
 					endif
-					# Seventh, save the TextGrid object to a text file
+					# Seventh, if the Context label is perseveration, invite the segmenter
+					# to insert a note at the playing of the stimulus.
+					if context$ = "Perseveration"
+						select TextGrid 'textGrid_object$'
+						Insert point... 'tg_notes' 'segment_selection_xmin'-0.01 stimulus
+					endif
+					# Eighth, save the TextGrid object to a text file
 					# on the local filesystem.
 					select TextGrid 'textGrid_object$'
 					Save as text file... 'textGrid_filepath$'
@@ -1101,8 +1168,10 @@ if (startup_node$ == startup_node_segment$)
 				# the boundaries of the selection or go back to the 
 				# top-level selection menu.
 				beginPause ("'procedure$' - Warning 1: selecting a zero-length interval.")
-					comment ("You have only selected a point in the Editor window, but you must select an interval in order to add a segmentation.")
-					comment ("To segment an interval of the audio recording, first highlight it in the Editor window, and then click 'Segment selection'.")
+					comment ("You have only selected a point in the Editor window, but you")
+					comment ("  must select an interval in order to add a segmentation.")
+					comment ("To segment an interval of the audio recording, first highlight it")
+					comment ("  in the Editor window, and then click 'Segment selection'.")
 				segment_action = endPause ("", "Segment", "Back", 2, 1)
 				if segment_action == 2
 					# If the segmenter chooses to 'Segment selection', then
