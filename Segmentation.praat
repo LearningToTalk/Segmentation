@@ -1030,21 +1030,12 @@ if (startup_node$ == startup_node_segment$)
 							option ("Perseveration")
 					endif
 					# Prompt the segmenter to choose a standard notes tier label, if appropriate.
-#					comment ("(2) [optional] choose one of the following standard notes, if appropriate.") 
-#			 		optionMenu ("Note", 1)
-#						option ("")
-#						option ("next stimulus")
-#						option ("TOS")
-#						option ("noise")
-#						option ("fragment")
-#						option ("FS")
-#						option ("NI")
 					comment ("(2) [optional] mark any of the following standard notes, if appropriate.") 
-			 		boolean: "talking over stimulus", 0
-			 		boolean: "noise during response", 0
-			 		boolean: "fragment", 0
-			 		boolean: "false start", 0
-			 		boolean: "not initial", 0
+			 		boolean ("talking over stimulus", 0)
+			 		boolean ("noise during response", 0)
+			 		boolean ("fragment", 0)
+			 		boolean ("false start", 0)
+			 		boolean ("not initial", 0)
 			 		comment ("(3) Then, click 'Segment selection'.")
 					comment ("     Note: If you would like to change the boundaries of the selection")
 					comment ("              before adding a Context label, do so in the Editor window,")
