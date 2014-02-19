@@ -66,6 +66,10 @@
 #			2) Added an automatic generation of "stimulus" note for notes tier when the 
 #			"Perseveration" context label is chosen, which is inserted at start of segment.
 
+# Author:		Mary E. Beckman
+# Date: 		February 19, 2014
+# Comment:	Added the "Mac via RDC" option for "location" for segmenters working on the 
+#			UMN server as a remote desktop virtual machine over a VPN connection.
 
 #=========================================================#
 #  Global variables (other than those defined in startup section on basis of user input)             #
@@ -151,6 +155,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 				optionMenu ("Location", 1)
 				option ("WaismanLab")
 				option ("ShevlinHallLab")
+				option ("Mac via RDC")
 				option ("Mac via VPN")
 				option ("Other (Beckman)")
 				option ("Other (not Beckman)")
@@ -172,6 +177,9 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 			elsif (location$ == "ShevlinHallLab")
 				drive$ = "//l2t.cla.umn.edu/tier2/"
 				audio_drive$ = "//l2t.cla.umn.edu/tier2/"
+			elsif (location$ == "Mac via RDC")
+				drive$ = "I:/"
+				audio_drive$ = "I:/"
 			elsif (location$ == "Mac via VPN")
 				drive$ = "/Volumes/tier2/"
 				audio_drive$ = "/Volumes/tier2onUSB/"
