@@ -1,74 +1,12 @@
 # Script:         Segmentation.praat
+# Repository: 	  https://github.com/LearningToTalk/Segmentation/ 
 
-#=========================================================#
-# Initial commit to https://github.com/LearningToTalk/Segmentation/ 
-#=========================================================#
 
-# Author:		Patrick Reidy             <reidy@ling.ohio-state.edu>
-# Affiliations:	Learning to Talk          <learningtotalk.org>
-#			The Ohio State University <linguistics.osu.edu>
-# Date: 		July 03, 2013
 
-#=========================================================#
-# Subsequent version history (after initial bug fixes on July 09).
-#=========================================================#
-
-# Author: 		Patrick F. Reidy
-# Date:		July 19, 2013
-# Comment:	Stable version of Segmentation.praat that can be used for both NWR &
-#			RWR TextGrids.  Tested on NWR_015L & RWR_010L.
-
-# Author:		Mary E. Beckman
-# Date: 		December 19, 2013, through January 1, 2014
-# Comment:	1) Added "Perseveration" category for Context labels for NWR and RWR.  
-# 
-#			2) Added specification of "location" and "test wave number" to variables elicited
-#			from user in startup, so that could accommodate the specification of global
-#			variables for file and directory path names directly in script (assuming that the
-#			local file system has a directory that is set up to mirror the directory structure
-#			on the Tier 2 drive of the shared UMN project server). 
-# 
-#			3) Made the mute function into a procedure so that the long stretch of code 
-#			does not need to be repeated twice; Also changed step 2 of that code so that 
-#			user gets feedback about muted intervals.
-# 
-#			4) Rewrote title of beginPause sections and associated "Comment" lines so
-#			that title is more informative about what step in procedure user is in and 
-#			also so that comment lines are not cut off by the right edge of the prompting
-#			window that beginPause opens.
-#
-#			5) Added code so that script can be used for segmenting GFTA recordings, too:
-#			5a) with a different set of options for Context labels and
-#			5b) an invoking of child-specific WordList file that is contingent on there being
-#			such (only needed when the child has a different order from "back-tracking" or
-# 			pages being stuck together or the like). 
-#
-#			6) Modified naming conventions for the files in the AudioAnonymizationLogs 
-#			directory so that they are specific to the segmenter and won't be overwritten
-#			if more than one segmenter works on a file.
-
-# Author:		Mary E. Beckman
-# Date: 		January 25, 2014
-# Comment:	Changed specification of Experimental ID to be by entering 3-digit ID instead
-#			of by scrolling down through a pull-down menu.  
-
-# Author:		Mary E. Beckman
-# Date: 		February 11, 2014
-# Comment:	Separated specification of drive$ and audio_drive$ so that can segment
-#			on a Mac with VPN connection to UMN server for all files other than the
-#			audio files, which are loaded from a local directory. 
-
-# Author:		Mary E. Beckman
-# Date: 		February 15, 2014
-# Comment:	1) Finalized the list of standard notes after discussion in group on February  10
-#			and then changed the specification of the standard notes to be by checking all 
-#			that appy from a series of Boolean prompts in the dialogue box.
-#			2) Added an automatic generation of "stimulus" note for notes tier when the 
-#			"Perseveration" context label is chosen, which is inserted at start of segment.
 
 
 #=========================================================#
-#  Global variables (other than those defined in startup section on basis of user input)             #
+#  Global variables (other than those defined in startup section on basis of user input) 
 #=========================================================#
 
 # Praat procedure.
@@ -114,8 +52,31 @@ tl_xmax$ = "XMax"
 
 
 #===============================================#
-#  Start-up section                                                                                           #
+#  Start-up section 
 #===============================================#
+debug_mode = 1
+
+# The startup wizard is a set of linked nodes: [n1] <-> [n2] <-> [n3] <-> ...
+# Each node is a procedure that displays a form to the user. During each 
+# procedure, a value called .result_node$ is computed which indicates 
+# whether the wizard should go forward, backward or abort.
+
+# Values for .result_node$
+node_quit$ = "quit"
+node_next$ = "next"
+node_back$ = "back"
+
+# Map a .result_node$ value onto the name of node in the wizard.
+procedure next_back_quit(.status$, .next_step$, .last_step$, .quit$) 
+	if .status$ == node_next$
+		.result$ = .next_step$
+	elsif .status$ == node_back$
+		.result$ = .last_step$
+	else
+		.result$ = .quit$
+	endif
+endproc
+
 # Name the nodes of the start-up procedure.
 startup_node_quit$     = "quit"
 startup_node_task$     = "task"
@@ -125,433 +86,155 @@ startup_node_location$ = "location"
 startup_node_testwave$ = "testwave"
 startup_node_subject$  = "subject"
 startup_node_segdata$  = "segdata"
+startup_node_audio$  = "audio"
+startup_node_wordlist$  = "wordlist"
 
-# The start-up procedure begins by asking the segmenter to specify his or her
-# initials so that the right version of the SegmentationDirectories.praat script is
-# sourced. That is, the "start node" of the start-up procedure is the node
-# 'startup_node_initials$'
+# [STARTUP WIZARD EVENT LOOP]
 startup_node$ = startup_node_initials$
 
+if debug_mode
+	writeInfoLine("Node: ", startup_node$)
+	appendInfoLine("")
+endif
 
-# The start-up procedure runs so long as the user has not quit or
-# finished and continued to the segmentation procedure.
-while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_segment$)
+# Start-up wizard runs as long as the user has not quit or finished.
+while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_segdata$)
 
-	# [NODE]
-	# specifies things about the segmenter and the location where segmenting is done:
-	#	1) segmenter's initials
-	#	2) location where segmentation is taking place (to determine tier2 drive name)
- 	if startup_node$ == startup_node_initials$
-		beginPause ("'procedure$' - Initializing session, step 1.")
-			# Prompt the user to enter the segmenter's initials.
-			comment ("Please enter your initials in the field below.")
-  			word    ("Your initials", "")
-			# Prompt the segmenter to specify where the segmentation is being done.
-			comment ("Please specify where the machine is on which you are working.")
-				optionMenu ("Location", 1)
-				option ("WaismanLab")
-				option ("ShevlinHallLab")
-				option ("Mac via VPN")
-				option ("Other (Beckman)")
-				option ("Other (not Beckman)")
-		button = endPause ("Quit", "Continue", 2)
-		# Use the 'button' variable to determine which node to transition to next.
-		if button == 1
-			# If the segmenter must quit this segmentation session prematurely
-			# (button = 1), transition to the 'startup_node_quit$' node.
-			startup_node$ = startup_node_quit$
-		else
-			# If the segmenter has entered initials and location and wishes to
-			# continue to the next step of the start-up procedure (button = 2),
-			# then set the value of the segmenters_initials$ variable and ...
-			segmenters_initials$ = your_initials$
-			# use the value of the 'location$' variable to set up the drive$ variable.
-			if (location$ == "WaismanLab")
-				drive$ = "L:/"
-				audio_drive$ = "L:/"
-			elsif (location$ == "ShevlinHallLab")
-				drive$ = "//l2t.cla.umn.edu/tier2/"
-				audio_drive$ = "//l2t.cla.umn.edu/tier2/"
-			elsif (location$ == "Mac via VPN")
-				drive$ = "/Volumes/tier2/"
-				audio_drive$ = "/Volumes/tier2onUSB/"
-			elsif (location$ == "Other (Beckman)")
-				drive$ = "/Volumes/tier2/"		
-				audio_drive$ = "/LearningToTalk/Tier2/"
-			elsif (location$ == "Other (not Beckman)")
-				exit Contact Mary Beckman and your segmentation guru to request another location
-			endif
-			# and then transition to the 'startup_node_testwave$' node so that the segmenter
-			# can choose the testwave (i.e., "TimePoint") of the data to be segmented.
-			startup_node$ = startup_node_testwave$
-		endif
-
- 	# [NODE]
-	# Specifies things about the set of recordings the segmenter will work on
-	#	3) the experimental task that elicited the recording and ...
-	#	4)  the test wave (e.g., "TimePoint1", "TimePoint2") of the recording 
-	elsif startup_node$ == startup_node_testwave$
-		beginPause ("'procedure$' - Initializing session, step 3 (task and test wave of recording).")
-			comment ("Please choose the experimental task of the recording.")
-				optionMenu ("Task", 2)
-				option ("NonWordRep")
-				option ("RealWordRep")
-				option ("GFTA")
-			# Prompt the segmenter to specify the testwave (i.e., the "TimePoint") of the data.
-			comment ("Please specify the test wave of the recording.")
-			optionMenu ("Testwave", 1)
-				option ("TimePoint1")
-				option ("TimePoint2")
-				option ("Other")
-
-		button = endPause ("Back", "Quit", "Continue", 3)
-		# Use the 'button' variable to determine which node to transition to next.
- 		if button == 1
-			# If the segmenter chooses to go 'Back', then transition back to the
- 			# 'startup_node_initials$' node.
-			startup_node$ = startup_node_initials$
-		elsif button == 2
- 			# If the segmenter chooses to 'Quit', then transition to the 
-			# 'startup_node_quit$' node.
-			startup_node$ = startup_node_quit$
-		elsif button == 3
-			# If the segmenter chooses to 'Continue', then use the value
-			# of the 'task$' variable (and 'testwave$' and 'drive$' and 'segmenters_initials$)  
-			# to set other variables that depend on these variables.
-
-			# [LOCAL FILE SYSTEM VARIABLES]
-			# Directory path names for navigating the local filesystem, beginning with those that
-			# are specific to the segmenter.
-
-			# The directory to where the ...SegmentationLog.txt file is written when a segmenter first  
-			# starts segmenting a file and from where the segmentation log is read on subsequent 
-			# segmentation sessions for a file when segmentation is still in progress.
-			segmentLog_dir$ = drive$+"Segmenting/Segmenters/"+segmenters_initials$+"/Logs"+task$
-
-			# The directory to where the ...segm.TextGrid file is written when a segmenter first  
-			# starts segmenting a file and from where the segmentation textgrid file is read on  
-			# subsequent segmentation sessions for a file when segmentation is still in progress.
-			textGrid_dir$ = drive$+"Segmenting/Segmenters/"+segmenters_initials$+"/Segmentation"+task$
-
-			# Shared drectories that will not be affected by the process of segmentation.
-
-			# The directory from where audio files are read.
-			audio_dir$ = audio_drive$+"DataAnalysis/"+task$+"/"+testwave$+"/Recordings"
-
-			# The directory from where word list tables are read.
-			wordList_dir$ = drive$+"DataAnalysis/"+task$+"/"+testwave$+"/WordLists"
-
-			# Shared directory that will changed by the process of segmentation.
-
-			# The directory to where anonymized audio log files are written.
-			# audioAnon_dir$ = drive$+"DataAnalysis/"+task$+"/"+testwave$+"/Recordings/Anonymized"
-			audioAnon_dir$ = drive$+"DataAnalysis/"+task$+"/"+testwave$+"/AudioAnonymizationLogs"
-
-			# Word List table columns
-			if task$ == "RealWordRep"
-				wl_trial  = 1
-				wl_trial$ = "TrialNumber"
-				wl_word   = 3
-				wl_word$  = "Word"
-			elsif task$ == "NonWordRep"
-				wl_trial  = 1
-				wl_trial$ = "TrialNumber"
-				wl_word   = 3
-				wl_word$  = "Orthography"
-			elsif task$ == "GFTA"
-				wl_trial  = 1
-				wl_trial$ = "word"
-				wl_word   = 3
-				wl_word$  = "ortho"
-			endif
-
-			# Then, transition to the 'startup_node_subject$' node.
-			startup_node$ = startup_node_subject$
-		endif
-
-	# [NODE]   experimental participant's ID
-	# Prompt the segmenter to choose the subject's experimental ID.
-	elsif startup_node$ == startup_node_subject$
-		# Open a dialog box and prompt the user to specify the subject's 3-digit id no.
-		beginPause ("'procedure$' - Initializing session, step 5 (participant ID).")
-			comment ("Please enter the participant's 3-digit ID number in the field below.")
-  			word    ("id number", "")
-		button = endPause ("Back", "Quit", "Continue", 3, 1)
-		# Use the 'button' variable to determine which node to transition to next.
-		if button == 1
-			# If the segmenter wishes to go to the previous step in the
-			# start-up procedure (button = 1), then transition to the
-			# 'startup_node_task$' node.
- 			startup_node$ = startup_node_task$
-		elsif button == 2
-			# If the segmenter wishes to quit this segmentation session
-			# prematurely (button = 2), then transition to the
-			# 'startup_node_quit$' node.
-			startup_node$ = startup_node_quit$
-		else
-			# If the segmenter wishes to continue to the next step in the
-			# start-up procedure (ie. loading the data files necessary to
-			# segment an audio recording) (button = 3), then transition to
-			# the 'startup_node_segdata$' node.
- 			startup_node$ = startup_node_segdata$
-		endif
-
-	# [NODE]  load or create data objects
-	# Respectively load or create all of the data objects that are
-	# necessary to segment an audio file.
-	# These data objects include:
-	#   1. An audio file
-	#   2. A word list table
-	#   3. A segmentation log
-	#   4. An audio-anonymization log
-	#   5. A TextGrid
-	elsif startup_node$ == startup_node_segdata$
-
-		# [AUDIO FILE]
-		# Determine which .wav (or .WAV) file in the 'audio_dir$' directory has a filename
-		# that includes the id number of the subject presently being segmented.
-		Create Strings as file list... wavFile 'audio_dir$'/'task$'_'id_number$'*.wav
-		n_wavs = Get number of strings
-		# We check to see if the list is empty and if so, whether that's because we're on
-		# a Mac and there is a WAV file instead. 
-		if ('n_wavs' == 0) & (macintosh or unix)
-			select Strings wavFile
-			Remove
-			Create Strings as file list... wavFile 'audio_dir$'/'task$'_'id_number$'*.WAV
-			n_wavs = Get number of strings
-		endif
-		# The resulting Strings object 'wavFile' should list exactly one .wav (or .WAV) 
-		# filename that corresponds to the correct audio file for this subject.
-		if (n_wavs > 0)
-			# If the Strings object 'wavFile' has at least one filename,
-			# use the filename in this Strings object to make string
-			# variables for the filename, basename, and filepath of the
-			# audio file on the local filesystem.
-			select Strings wavFile
-			audio_filename$ = Get string... 1
-			audio_basename$ = left$(audio_filename$, length(audio_filename$) - 4)
-			audio_filepath$ = "'audio_dir$'/'audio_filename$'"
-			# Also make the corresponding experimental_ID$ variable that need later.
-			experimental_ID$ = mid$(audio_basename$, length(task$)+2, length(audio_basename$))
-			audio_sound$  = "'experimental_ID$'_Audio"
-			# Remove the Strings object from the Praat object list.
-			select Strings wavFile
-			Remove
-			# Read in the audio file, and rename it to the value of the
-			# 'audio_sound$' string variable.
- 			Read from file... 'audio_filepath$'
-			select Sound 'audio_basename$'
-			Rename... 'audio_sound$'
-##		else ....
-##			# The code for what should happen if n_wavs is not greater than 0 ....
-##			# has to go at the very end of this while loop in order to avoid executing 
-##			# anything else, since the Praat scripting language doesn't seem to have 
-##			# the equivalent of the "next" jump back to the beginning of the loop. 
-##			# So the following section should be indented by 3 tabs rather than 2.
-
-		# [WORD LIST TABLE]
-		# Make string variables for the word list table's basename,
-		# filename, and filepath on the local filesystem, using the
-		# 'subject's experimental ID, which was chosen during the previous
-		# step in the start-up procedure (see the code block for the
-		# 'startup_node_subject$' node above) and the 'wordList_dir$' 
-		# variable that is imported from the '...Directories.praat' file.
-		wordList_basename$ = "'task$'_'experimental_ID$'_WordList"
-		wordList_filename$ = "'wordList_basename$'.txt"
-		wordList_filepath$ = "'wordList_dir$'/'wordList_filename$'"
-		wordList_table$    = "'experimental_ID$'_WordList"
-
-		# Determine whether a Word List table exists on the local file system.
-		wordList_exists = fileReadable(wordList_filepath$)
-		# What we do with this information depends on the task, because ...
-		if task$ == "GFTA"
-			# If the task is GFTA, there is usually just one file for everyone.
-			if (wordList_exists == 0)
-				wordList_basename$ = "GFTA_info"
-				wordList_filepath$ = "'drive$'DataAnalysis/GFTA/GFTA_info.txt"
-			endif
-			# But in either case we want the Table Object to be called the same 
-			# thing so we'll reset the wordList_table$ variable.
-			wordList_table$    =  "gfta_wordlist"
-		endif
+	# [INITIALS, LOCATION]
+	if startup_node$ == startup_node_initials$
+		@startup_initials()
+		@log_initials()
 		
-		# Determine again whether a Word List table exists on the local file system.
-		wordList_exists = fileReadable(wordList_filepath$)
-		if (wordList_exists)
-			# Read the word list table from the local filesystem, and then
-			# rename it according to the 'wordList_table$' variable.
-			Read Table from tab-separated file... 'wordList_filepath$'
-			select Table 'wordList_basename$'
-			Rename... 'wordList_table$'
-			# Determine the number of trials (both Familiarization and Test
-			# trials) in this experimental session.
-			select Table 'wordList_table$'
-			n_trials = Get number of rows
-##		else ....
-##			# The code for what should happen if wordList_exists has to be toward the 
-##			# end of this while loop (just before the else for if n_wavs not greater than 0).
-##			# So this following section should be indented by 4 tabs rather than 3.
+		@next_back_quit(startup_initials.result_node$, startup_node_testwave$, "", startup_node_quit$)
+		startup_node$ = next_back_quit.result$
+		
+	# [TASK, TIMEPOINT]
+	elsif startup_node$ == startup_node_testwave$
+		@startup_testwave()
+		@log_testwave()
 
-		# [SEGMENTATION LOG]
-		# Make string variables for the segmentation log's basename,
-		# filename, and filepath on the local filesystem, using the
-		# 'subject's experimental ID, which was chosen during the previous
-		# step in the start-up procedure (see the code block for the
-		# 'startup_node_subject$' node above) and the 'segmentLog_dir$' 
-		# variable that is imported from the '...Directories.praat' file.
-		segmentLog_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'segmentLog"
-		segmentLog_filename$ = "'segmentLog_basename$'.txt"
-		segmentLog_filepath$ = "'segmentLog_dir$'/'segmentLog_filename$'"
-		# Make a name for the segmentation log Praat Table.
-		segmentLog_table$    = "'experimental_ID$'_SegmentLog"
-		# Determine whether a segmentation log exists on the local file
-		# system.  If a segmentation log exists, then the current session
-		# is a continuation of a previous session during which the same
-		# subject's audio file was segmented.
-		segmentLog_exists = fileReadable(segmentLog_filepath$)
-		# Use the 'segmentLog_exists' variable to determine whether the
-		# segmentation log needs to be loaded or created from scratch.
- 		if (segmentLog_exists)
-			# If a segmentation log exists on the local file system,
-			# first read it in as a Praat Table, then rename that table
-			# according to the 'segmentLog_table$' variable.
-			Read Table from tab-separated file... 'segmentLog_filepath$'
-			select Table 'segmentLog_basename$'
- 			Rename... 'segmentLog_table$'
+		@next_back_quit(startup_testwave.result_node$, startup_node_subject$, startup_node_initials$, startup_node_quit$)
+		startup_node$ = next_back_quit.result$
+	
+	# [SUBJECT]
+	elsif startup_node$ == startup_node_subject$
+		
+		# [LOCAL FILE SYSTEM VARIABLES] Use results from the previous nodes to generate filepaths
+		drive$ = startup_initials.drive$
+		audio_drive$ = startup_initials.audio_drive$
+		task$ = startup_testwave.task$
+		testwave$ = startup_testwave.testwave$
+		segmenters_initials$ = startup_initials.initials$
+		
+		@segmentation_filepaths(drive$, audio_drive$, task$, testwave$, segmenters_initials$)
+		@log_segmentation_filepaths()
+		
+		audio_dir$ = segmentation_filepaths.audio_dir$
+		audioAnon_dir$ = segmentation_filepaths.audioAnon_dir$
+		segmentLog_dir$ = segmentation_filepaths.segmentLog_dir$
+		textGrid_dir$ = segmentation_filepaths.textGrid_dir$
+		wordList_dir$ = segmentation_filepaths.wordList_dir$
+		
+		# Prompt for ID
+		@startup_id()
+		@log_startup_id()
+		
+		@next_back_quit(startup_id.result_node$, startup_node_audio$, startup_node_testwave$, startup_node_quit$)
+		startup_node$ = next_back_quit.result$
+
+	# [AUDIO FILE]
+	elsif startup_node$ == startup_node_audio$
+		id_number$ = startup_id.id_number$
+		@startup_load_audio(audio_dir$, task$, id_number$)
+		@log_load_audio()
+		
+		@next_back_quit(startup_load_audio.result_node$, startup_node_wordlist$, "", startup_node_quit$)
+		startup_node$ = next_back_quit.result$
+
+	# [WORD LIST TABLE]
+	elsif startup_node$ == startup_node_wordlist$
+		audio_sound$ = startup_load_audio.audio_sound$
+		experimental_ID$ = startup_load_audio.experimental_ID$
+		@startup_wordlist(task$, experimental_ID$, drive$, wordList_dir$)
+		@log_startup_wordlist()
+		
+		@next_back_quit(startup_wordlist.result_node$, startup_node_segdata$, "", startup_node_quit$)
+		startup_node$ = next_back_quit.result$
+
+	endif
+
+endwhile
+
+
+
+
+# [SEGMENTATION DATA] 
+# Load or initialize data objects:
+# 1. A segmentation log
+# 2. An audio-anonymization log
+# 3. A TextGrid
+if startup_node$ == startup_node_segdata$
+
+	wordList_table$ = startup_wordlist.wordList_table$
+	n_trials = startup_wordlist.n_trials
+	
+	# [SEGMENTATION LOG]
+	# Make string variables for the segmentation log's basename,
+	# filename, and filepath on the local filesystem, using the
+	# 'subject's experimental ID, which was chosen during the previous
+	# step in the start-up procedure (see the code block for the
+	# 'startup_node_subject$' node above) and the 'segmentLog_dir$' 
+	# variable that is imported from the '...Directories.praat' file.
+	segmentLog_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'segmentLog"
+	segmentLog_filename$ = "'segmentLog_basename$'.txt"
+	segmentLog_filepath$ = "'segmentLog_dir$'/'segmentLog_filename$'"
+	# Make a name for the segmentation log Praat Table.
+	segmentLog_table$    = "'experimental_ID$'_SegmentLog"
+	# Determine whether a segmentation log exists on the local file
+	# system.  If a segmentation log exists, then the current session
+	# is a continuation of a previous session during which the same
+	# subject's audio file was segmented.
+	segmentLog_exists = fileReadable(segmentLog_filepath$)
+	# Use the 'segmentLog_exists' variable to determine whether the
+	# segmentation log needs to be loaded or created from scratch.
+	if (segmentLog_exists)
+		# If a segmentation log exists on the local file system,
+		# first read it in as a Praat Table, then rename that table
+		# according to the 'segmentLog_table$' variable.
+		Read Table from tab-separated file... 'segmentLog_filepath$'
+		select Table 'segmentLog_basename$'
+		Rename... 'segmentLog_table$'
+
+		# Furthermore, if there is an extant segmentation log, then
+		# either the current segmentation session is a continuation of a
+		# segmentation session that was not completed, or the segmenter
+		# has re-opened a file that he / she already segmented, so ..
+
+		# Get the values for the NumberOfTrials and the NumberOfTrialsSegmented. 
+		n_trials_total = Get value... 1 'sl_nTrials$'
+		n_trials_segmented = Get value... 1 'sl_segTrials$'
+
+		# Check to see if there are any trials left to be segmented. 
+		if ('n_trials_segmented' >= 'n_trials_total')
+			# If there are no more trials to be segmented in this file, 
+			# first display an error message to the segmenter,
+			# and then quit this segmentation session.
+			beginPause ("'procedure$' - Initialization error 5. Reopening finished file.")
+				comment ("You seem to be continuing a segmentation session for ")
+				comment ("  'experimental_ID$', but the 'segmentLog_filename$'")
+				comment("   registers that you have segmented all the trials.")
+				comment ("If you did not already segment this file, report this")
+				comment("   error to your Segmentation Guru.")
+			endPause ("Quit segmenting", 1, 1)
+			# Transition to the 'startup_node_quit$' node.
+			startup_node$ = startup_node_quit$
+		else
 
 			# Furthermore, if there is an extant segmentation log, then
-			# either the current segmentation session is a continuation of a
-			# segmentation session that was not completed, or the segmenter
-			# has re-opened a file that he / she already segmented, so ..
-
-			# Get the values for the NumberOfTrials and the NumberOfTrialsSegmented. 
-			n_trials_total = Get value... 1 'sl_nTrials$'
- 			n_trials_segmented = Get value... 1 'sl_segTrials$'
- 
-			# Check to see if there are any trials left to be segmented. 
-			if ('n_trials_segmented' >= 'n_trials_total')
- 				# If there are no more trials to be segmented in this file, 
- 				# first display an error message to the segmenter,
- 				# and then quit this segmentation session.
-				beginPause ("'procedure$' - Initialization error 5. Reopening finished file.")
-					comment ("You seem to be continuing a segmentation session for ")
-					comment ("  'experimental_ID$', but the 'segmentLog_filename$'")
-					comment("   registers that you have segmented all the trials.")
-					comment ("If you did not already segment this file, report this")
-					comment("   error to your Segmentation Guru.")
-				endPause ("Quit segmenting", 1, 1)
-				# Transition to the 'startup_node_quit$' node.
-				startup_node$ = startup_node_quit$
-			else
-
-				# Furthermore, if there is an extant segmentation log, then
-				# the current segmentation session is a continuation of a
-				# previous session for the same subject, and so there should
-				# also be  an anonymized-audio log file, and a segmentation
-				# TextGrid that can be read from the local filesystem.
- 
-  				# [AUDIO-ANONYMIZATION LOG]
-				# Make string variables for the audio-anonymization log's
-				# basename, filename, and filepath on the local filesystem.
-				audioLog_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'audioLog"
-				audioLog_filename$ = "'audioLog_basename$'.txt"
- 				audioLog_filepath$ = "'audioAnon_dir$'/'audioLog_filename$'"
-				audioLog_table$    = "'experimental_ID$'_AudioLog"
- 				# Look for the audio-anonymization log on the local filesystem.
-				audioLog_exists = fileReadable(audioLog_filepath$)
- 				if (audioLog_exists)
-					# If the audio-anonymization log exists on the local
-					# filesystem, read it in as a Praat Table and then rename
-					# it according to the 'audioLog_table$' variable.
-					Read Table from tab-separated file... 'audioLog_filepath$'
-					select Table 'audioLog_basename$'
-					Rename... 'audioLog_table$'
-					# Sort the rows of the audio-anonymization log in
- 					# ascending order of their XMin value.
-					select Table 'audioLog_table$'
-					Sort rows... 'al_xmin$'
-					# Anonymize the audio file on the fly.
-					select Table 'audioLog_table$'
-					n_anonymizations = Get number of rows
- 					for anon to n_anonymizations
- 						select Table 'audioLog_table$'
-						anon_xmin = Get value... 'anon' 'al_xmin$'
-						anon_xmax = Get value... 'anon' 'al_xmax$'
-						select Sound 'audio_sound$'
-						Set part to zero... 'anon_xmin' 'anon_xmax' at nearest zero crossing
-					endfor
-				else
- 					# If the audio-anonymization log doesn't exist on the local
- 					# filesystem, first display an error message to the segmenter,
- 					# and then quit this segmentation session.
-					beginPause ("'procedure$' - Initialization error 4. Cannot load audio log file.")
-						comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'.")
-						comment ("But there doesn't seem to be an audio-anonymization log for this subject")
-						comment ("     on the local filesystem.")
-						comment ("Check that the following directory exists on the local filesystem:")
-  						comment ("   'audioAnon_dir$'")
-						comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_'segmenters_initials$'audioLog.txt." )
-					endPause ("Quit segmenting & check filesystem", 1, 1)
-					# Transition to the 'startup_node_quit$' node.
-					startup_node$ = startup_node_quit$
-				endif
-
-				# [SEGMENTATION TEXTGRID]
-				# Make string variables for the segmentation TextGrid's
- 				# basename, filename, and filepath on the local filesystem.
-				textGrid_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'segm"
-				textGrid_filename$ = "'textGrid_basename$'.TextGrid"
-				textGrid_filepath$ = "'textGrid_dir$'/'textGrid_filename$'"
-				textGrid_object$   = "'experimental_ID$'_Segmentation"
-				# Look for the segmentation TextGrid in the filesystem.
-				textGrid_exists = fileReadable(textGrid_filepath$)
-				if (textGrid_exists)
-					# If the segmentation TextGrid exists on the local
-					# filesystem, read it in as a Praat TextGrid object, and
-					# then rename it according to the 'textGrid_object$' variable.
-					Read from file... 'textGrid_filepath$'
-					select TextGrid 'textGrid_basename$'
-					Rename... 'textGrid_object$'
-					# At this point, each of the data files necessary to 
-					# segment an audio file have been read in from the local
-					# filesystem.  So, segmentation can begin.
-					# Transition to the 'startup_node_segment$' node.
-					startup_node$ = startup_node_segment$
-				else
-					# If the segmentation TextGrid doesn't exist on the local
-					# filesystem, first display an error message to the segmenter,
-					# and then quit this segmentation session.
-					beginPause ("'procedure$' - Initialization error 3. Cannot load segmentation log file.")
-						comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'."
-						comment ("But there doesn't seem to be a segmentation TextGrid for this subject")
-						comment ("     on the local filesystem.")
-						comment ("Check that the following directory exists on the local filesystem:")
-						comment ("   'textGrid_dir$'")
- 						comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_'segmenters_initials$'segm.TextGrid"
- 					endPause ("Quit segmenting & check filesystem", 1, 1)
-					# Transition to the 'startup_node_quit$' node.
-     					startup_node$ = startup_node_quit$
-  				endif
-			endif 
- ##			# This is the end of the conditional about whether there are more trials to be segmented.
-		else
- 			# If a segmentation log doesn't exist on the local file system,
- 			# then this means the segmenter has not made any progress on
- 			# segmenting this subject's audio recording.  Hence, the
- 			# segmentation log, the audio-anonymization log, and the
- 			# segmentation TextGrid all need to be created.
-
- 			# [SEGMENTATION LOG]
- 			# Create the segmentation log as a Praat Table, and initialize
- 			# its values.
- 			current_time$ = replace$(date$(), " ", "_", 0)
-			Create Table with column names... 'segmentLog_table$' 1 'sl_segmenter$' 'sl_startDate$' 'sl_endDate$' 'sl_nTrials$' 'sl_segTrials$'
-			select Table 'segmentLog_table$'
-			Set string value... 1 'sl_segmenter$' 'segmenters_initials$'
-			Set string value... 1 'sl_startDate$' 'current_time$'
-			Set string value... 1 'sl_endDate$' 'current_time$'
-			Set numeric value... 1 'sl_nTrials$' 'n_trials'
-			Set numeric value... 1 'sl_segTrials$' 0
+			# the current segmentation session is a continuation of a
+			# previous session for the same subject, and so there should
+			# also be  an anonymized-audio log file, and a segmentation
+			# TextGrid that can be read from the local filesystem.
 
 			# [AUDIO-ANONYMIZATION LOG]
 			# Make string variables for the audio-anonymization log's
@@ -560,16 +243,44 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 			audioLog_filename$ = "'audioLog_basename$'.txt"
 			audioLog_filepath$ = "'audioAnon_dir$'/'audioLog_filename$'"
 			audioLog_table$    = "'experimental_ID$'_AudioLog"
- 			# Create the audio-anonymization log as a Praat Table with
-			# 1 row.  It needs to be guaranteed that the audio-anonymization
-			# log has at least 1 row; otherwise, there will be trouble
-			# if the segmenter tries to quit and resume without adding
-			# an interval that needs to be anonymized.  Initialize the
-			# audio-anonymization log with the interval [0, 0.01] muted.
-			Create Table with column names... 'audioLog_table$' 1 'al_xmin$' 'al_xmax$'
-			select Table 'audioLog_table$'
-			Set numeric value... 1 'al_xmin$' 0
-			Set numeric value... 1 'al_xmax$' 0.01
+			# Look for the audio-anonymization log on the local filesystem.
+			audioLog_exists = fileReadable(audioLog_filepath$)
+			if (audioLog_exists)
+				# If the audio-anonymization log exists on the local
+				# filesystem, read it in as a Praat Table and then rename
+				# it according to the 'audioLog_table$' variable.
+				Read Table from tab-separated file... 'audioLog_filepath$'
+				select Table 'audioLog_basename$'
+				Rename... 'audioLog_table$'
+				# Sort the rows of the audio-anonymization log in
+				# ascending order of their XMin value.
+				select Table 'audioLog_table$'
+				Sort rows... 'al_xmin$'
+				# Anonymize the audio file on the fly.
+				select Table 'audioLog_table$'
+				n_anonymizations = Get number of rows
+				for anon to n_anonymizations
+					select Table 'audioLog_table$'
+					anon_xmin = Get value... 'anon' 'al_xmin$'
+					anon_xmax = Get value... 'anon' 'al_xmax$'
+					select Sound 'audio_sound$'
+					Set part to zero... 'anon_xmin' 'anon_xmax' at nearest zero crossing
+				endfor
+			else
+				# If the audio-anonymization log doesn't exist on the local
+				# filesystem, first display an error message to the segmenter,
+				# and then quit this segmentation session.
+				beginPause ("'procedure$' - Initialization error 4. Cannot load audio log file.")
+					comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'.")
+					comment ("But there doesn't seem to be an audio-anonymization log for this subject")
+					comment ("     on the local filesystem.")
+					comment ("Check that the following directory exists on the local filesystem:")
+					comment ("   'audioAnon_dir$'")
+					comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_'segmenters_initials$'audioLog.txt." )
+				endPause ("Quit segmenting & check filesystem", 1, 1)
+				# Transition to the 'startup_node_quit$' node.
+				startup_node$ = startup_node_quit$
+			endif
 
 			# [SEGMENTATION TEXTGRID]
 			# Make string variables for the segmentation TextGrid's
@@ -578,78 +289,527 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 			textGrid_filename$ = "'textGrid_basename$'.TextGrid"
 			textGrid_filepath$ = "'textGrid_dir$'/'textGrid_filename$'"
 			textGrid_object$   = "'experimental_ID$'_Segmentation"
-			# Create the segmentation TextGrid as a Praat TextGrid object
-			# with five tiers: Trial, Word, Context, Repetition, SegmNotes,
-			# of which only SegmNotes is a Point Tier.
-			select Sound 'audio_sound$'
-			To TextGrid... "'tg_trial$' 'tg_word$' 'tg_context$' 'tg_repetition$' 'tg_notes$'" 'tg_notes$'
-			select TextGrid 'audio_sound$'
-			Rename... 'textGrid_object$'
+			# Look for the segmentation TextGrid in the filesystem.
+			textGrid_exists = fileReadable(textGrid_filepath$)
+			if (textGrid_exists)
+				# If the segmentation TextGrid exists on the local
+				# filesystem, read it in as a Praat TextGrid object, and
+				# then rename it according to the 'textGrid_object$' variable.
+				Read from file... 'textGrid_filepath$'
+				select TextGrid 'textGrid_basename$'
+				Rename... 'textGrid_object$'
+				# At this point, each of the data files necessary to 
+				# segment an audio file have been read in from the local
+				# filesystem.  So, segmentation can begin.
+				# Transition to the 'startup_node_segment$' node.
+				startup_node$ = startup_node_segment$
+			else
+				# If the segmentation TextGrid doesn't exist on the local
+				# filesystem, first display an error message to the segmenter,
+				# and then quit this segmentation session.
+				beginPause ("'procedure$' - Initialization error 3. Cannot load segmentation log file.")
+					comment ("You seem to be continuing a segmentation session for subject 'experimental_ID$'."
+					comment ("But there doesn't seem to be a segmentation TextGrid for this subject")
+					comment ("     on the local filesystem.")
+					comment ("Check that the following directory exists on the local filesystem:")
+					comment ("   'textGrid_dir$'")
+					comment ("Also check that this directory contains a file named 'task$'_'experimental_ID$'_'segmenters_initials$'segm.TextGrid"
+				endPause ("Quit segmenting & check filesystem", 1, 1)
+				# Transition to the 'startup_node_quit$' node.
+					startup_node$ = startup_node_quit$
+			endif
+		endif 
+ ##			# This is the end of the conditional about whether there are more trials to be segmented.
+	else
+		# If a segmentation log doesn't exist on the local file system,
+		# then this means the segmenter has not made any progress on
+		# segmenting this subject's audio recording.  Hence, the
+		# segmentation log, the audio-anonymization log, and the
+		# segmentation TextGrid all need to be created.
 
-			# [TEST FILE PATHNAMES]
-			# Attempt to save the TextGrid, the audio-anonymization log,
-			# and the segmentation log to the local filesystem before
-			# moving on to segmenting.  This will ensure that when
-			# actual data is saved later on in the script, doing so
-			# will succeed.
-			select TextGrid 'textGrid_object$'
-			Save as text file... 'textGrid_filepath$'
-			select Table 'audioLog_table$'
-			Save as tab-separated file... 'audioLog_filepath$'
-			select Table 'segmentLog_table$'
-			Save as tab-separated file... 'segmentLog_filepath$'
-			# At this point, all of the data necessary to continue with
-			# the segmentation session has either been read from the
-			# local filesystem or created from scratch.
-			# Transition to the 'startup_node_segment$' node.
-			startup_node$ = startup_node_segment$
-		endif
-##				# At least 4 tabs indenting would end after this. 
+		# [SEGMENTATION LOG]
+		# Create the segmentation log as a Praat Table, and initialize
+		# its values.
+		current_time$ = replace$(date$(), " ", "_", 0)
+		Create Table with column names... 'segmentLog_table$' 1 'sl_segmenter$' 'sl_startDate$' 'sl_endDate$' 'sl_nTrials$' 'sl_segTrials$'
+		select Table 'segmentLog_table$'
+		Set string value... 1 'sl_segmenter$' 'segmenters_initials$'
+		Set string value... 1 'sl_startDate$' 'current_time$'
+		Set string value... 1 'sl_endDate$' 'current_time$'
+		Set numeric value... 1 'sl_nTrials$' 'n_trials'
+		Set numeric value... 1 'sl_segTrials$' 0
 
-##		# [WORD LIST TABLE] section continues here ...
-		else
-			# If there is no Word List table on the local filesystem,
-			# first display an error message to the segmenter and then
-			# quit this segmentation session.
-			beginPause ("'procedure$' - Initialization error 2. Cannot load word list file.")
-				comment ("There doesn't seem to be a word list table for this subject on the local filesystem.")
-				comment ("Check that the following directory exists on the local filesystem:")
-				comment ("'wordList_dir$'")
-				comment ("Also check that this directory contains a word list table whose filename is 'task$'_'experimental_ID$'_WordList.txt.")
-			endPause ("Quit segmenting & check filesystem", 1, 1)
- 			# Transition to the 'startup_node_quit$' node.
-			startup_node$ = startup_node_quit$
-		endif  
-##			# At least 3 tabs indenting would end after this. 
+		# [AUDIO-ANONYMIZATION LOG]
+		# Make string variables for the audio-anonymization log's
+		# basename, filename, and filepath on the local filesystem.
+		audioLog_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'audioLog"
+		audioLog_filename$ = "'audioLog_basename$'.txt"
+		audioLog_filepath$ = "'audioAnon_dir$'/'audioLog_filename$'"
+		audioLog_table$    = "'experimental_ID$'_AudioLog"
+		# Create the audio-anonymization log as a Praat Table with
+		# 1 row.  It needs to be guaranteed that the audio-anonymization
+		# log has at least 1 row; otherwise, there will be trouble
+		# if the segmenter tries to quit and resume without adding
+		# an interval that needs to be anonymized.  Initialize the
+		# audio-anonymization log with the interval [0, 0.01] muted.
+		Create Table with column names... 'audioLog_table$' 1 'al_xmin$' 'al_xmax$'
+		select Table 'audioLog_table$'
+		Set numeric value... 1 'al_xmin$' 0
+		Set numeric value... 1 'al_xmax$' 0.01
 
-##		# [AUDIO FILE] section continues here ...
-  		else
-			# If the Strings object 'wavFile' has no filenames on it,
-			# then the script was unable to find a candidate .wav file.
-			# Display an error message to the segmenter and then
-			# quit this segmentation session.
-			beginPause ("'procedure$' - Initialization error 1. Cannot load audio file.")
-				comment ("There doesn't seem to be an audio file for subject 'id_number$'")
-				comment ("   on the local filesystem.")
-				comment ("Check that the following directory exists on the local filesystem:")
-				comment ("'audio_dir$'")
-				comment ("Also check that this directory contains a wave file whose basename")
-				comment ("      begins with 'task$'_'id_number$'.")
-			endPause ("Quit segmenting & check filesystem", 1, 1)
-			# Transition to the 'startup_node_quit$' node.
-			startup_node$ = startup_node_quit$
-		endif
+		# [SEGMENTATION TEXTGRID]
+		# Make string variables for the segmentation TextGrid's
+		# basename, filename, and filepath on the local filesystem.
+		textGrid_basename$ = "'task$'_'experimental_ID$'_'segmenters_initials$'segm"
+		textGrid_filename$ = "'textGrid_basename$'.TextGrid"
+		textGrid_filepath$ = "'textGrid_dir$'/'textGrid_filename$'"
+		textGrid_object$   = "'experimental_ID$'_Segmentation"
+		# Create the segmentation TextGrid as a Praat TextGrid object
+		# with five tiers: Trial, Word, Context, Repetition, SegmNotes,
+		# of which only SegmNotes is a Point Tier.
+		select Sound 'audio_sound$'
+		To TextGrid... "'tg_trial$' 'tg_word$' 'tg_context$' 'tg_repetition$' 'tg_notes$'" 'tg_notes$'
+		select TextGrid 'audio_sound$'
+		Rename... 'textGrid_object$'
+
+		# [TEST FILE PATHNAMES]
+		# Attempt to save the TextGrid, the audio-anonymization log,
+		# and the segmentation log to the local filesystem before
+		# moving on to segmenting.  This will ensure that when
+		# actual data is saved later on in the script, doing so
+		# will succeed.
+		select TextGrid 'textGrid_object$'
+		Save as text file... 'textGrid_filepath$'
+		select Table 'audioLog_table$'
+		Save as tab-separated file... 'audioLog_filepath$'
+		select Table 'segmentLog_table$'
+		Save as tab-separated file... 'segmentLog_filepath$'
+		# At this point, all of the data necessary to continue with
+		# the segmentation session has either been read from the
+		# local filesystem or created from scratch.
+		# Transition to the 'startup_node_segment$' node.
+		startup_node$ = startup_node_segment$
 	endif
-endwhile
+endif
+
+
+
+
+# [NODE] Get user's initials and where they are working from
+procedure startup_initials()
+	beginPause ("'procedure$' - Initializing session, step 1.")
+		# Prompt the user to enter the user's initials.
+		comment ("Please enter your initials in the field below.")
+  		word    ("Your initials", "")
+		# Prompt the user to specify where the script is being run.
+		comment ("Please specify where the machine is on which you are working.")
+			optionMenu ("Location", 1)
+			option ("WaismanLab")
+			option ("ShevlinHallLab")
+			option ("Mac via RDC")
+			option ("Mac via VPN")
+			option ("Other (Beckman)")
+			option ("Other (not Beckman)")
+	button = endPause ("Quit", "Continue", 2)
+	
+	# Use the 'button' variable to determine which node to transition to next.
+	if button == 1
+		.result_node$ = node_quit$
+	else
+		# If the segmenter has entered initials and location and wishes to
+		# continue to the next step of the start-up procedure (button = 2),
+		# then set the value of the .initials$ variable
+		.initials$ = your_initials$
+		.location$ = location$
+		
+		# Use the value of the '.location$' variable to set up the 'drive$' variables.
+		if (.location$ == "WaismanLab")
+			.drive$ = "L:/"
+			.audio_drive$ = "L:/"
+		elsif (.location$ == "ShevlinHallLab")
+			.drive$ = "//l2t.cla.umn.edu/tier2/"
+			.audio_drive$ = "//l2t.cla.umn.edu/tier2/"
+		elsif (.location$ == "Mac via RDC")
+			.drive$ = "I:/"
+			.audio_drive$ = "I:/"
+		elsif (.location$ == "Mac via VPN")
+			.drive$ = "/Volumes/tier2/"
+			.audio_drive$ = "/Volumes/tier2onUSB/"
+		elsif (.location$ == "Other (Beckman)")
+			.drive$ = "/Volumes/tier2/"		
+			.audio_drive$ = "/LearningToTalk/Tier2/"
+		elsif (.location$ == "Other (not Beckman)")
+			exit Contact Mary Beckman and your segmentation guru to request another location
+		endif
+		
+		.result_node$ = node_next$
+	endif
+endproc
+
+# console output for debugging
+procedure log_initials()
+	if debug_mode
+		appendInfoLine("---- log_initials() ----")
+		appendInfoLine("Exit Status: ", startup_initials.result_node$)
+		if startup_initials.result_node$ == node_next$
+			appendInfoLine("derived values: ")
+			appendInfoLine(tab$, ".initials$: ", startup_initials.initials$)
+			appendInfoLine(tab$, ".drive$: ", startup_initials.drive$)
+			appendInfoLine(tab$, ".audio_drive$: ", startup_initials.audio_drive$)
+		endif
+		appendInfoLine("")
+	endif
+endproc
+
+
+
+
+# [NODE] Get the experimental task and the timepoint ("testwave") of the recording
+procedure startup_testwave()
+	beginPause ("'procedure$' - Initializing session, step 3 (task and test wave of recording).")
+		comment ("Please choose the experimental task of the recording.")
+			optionMenu ("Task", 2)
+			option ("NonWordRep")
+			option ("RealWordRep")
+			option ("GFTA")
+		# Prompt the segmenter to specify the testwave (i.e., the "TimePoint") of the data.
+		comment ("Please specify the test wave of the recording.")
+		optionMenu ("Testwave", 1)
+			option ("TimePoint1")
+			option ("TimePoint2")
+			option ("Other")
+	button = endPause ("Back", "Quit", "Continue", 3)
+	
+	# Use the 'button' variable to determine which node to transition to next.
+	if button == 1
+		.result_node$ = node_back$
+	elsif button == 2
+		.result_node$ = node_quit$
+	elsif button == 3
+		# If the segmenter chooses to 'Continue', then store the value
+		# of the 'task$' and 'testwave$' variables
+		.testwave$ = testwave$
+		.task$ = task$
+		
+		.result_node$ = node_next$
+	endif
+endproc
+
+# console output for debugging
+procedure log_testwave()
+	if debug_mode
+		appendInfoLine("---- log_testwave() ----")
+		appendInfoLine("Exit Status: ", startup_testwave.result_node$)
+		if startup_testwave.result_node$ == node_next$
+			appendInfoLine("derived values: ")
+			appendInfoLine(tab$, ".task$: ", startup_testwave.task$)
+			appendInfoLine(tab$, ".testwave$: ", startup_testwave.testwave$)
+		endif
+		appendInfoLine("")
+	endif
+endproc
+
+
+
+
+# [SUBNODE] Setup directory path names for navigating the local filesystem.
+procedure segmentation_filepaths(.drive$, .audio_drive$, .task$, .testwave$, .segmenters_initials$)
+	segmenter_dir$ = .drive$ + "Segmenting/Segmenters/" + .segmenters_initials$
+
+	# The directory to where the ...SegmentationLog.txt file is written when a segmenter first  
+	# starts segmenting a file and from where the segmentation log is read on subsequent 
+	# segmentation sessions for a file when segmentation is still in progress.
+	.segmentLog_dir$ = segmenter_dir$ + "/Logs" + .task$
+
+	# The directory to where the ...segm.TextGrid file is written when a segmenter first  
+	# starts segmenting a file and from where the segmentation textgrid file is read on  
+	# subsequent segmentation sessions for a file when segmentation is still in progress.
+	.textGrid_dir$ = segmenter_dir$ + "/Segmentation" + .task$
+
+	# Shared directories that will not be affected by the process of segmentation.
+	data_dir$ = .drive$ + "DataAnalysis/" + .task$ + "/" + .testwave$
+	
+	# The directory from where audio files are read.
+	.audio_dir$ = .audio_drive$ + "DataAnalysis/" + .task$ + "/" + .testwave$ + "/Recordings"
+
+	# The directory from where word list tables are read.
+	.wordList_dir$ = data_dir$ + "/WordLists"
+
+	# Shared directory that will changed by the process of segmentation.
+	# The directory to where anonymized audio log files are written.
+	.audioAnon_dir$ = data_dir$ + "/AudioAnonymizationLogs"
+
+	# Word List table columns
+	if .task$ == "RealWordRep"
+		.wl_trial  = 1
+		.wl_trial$ = "TrialNumber"
+		.wl_word   = 3
+		.wl_word$  = "Word"
+	elsif .task$ == "NonWordRep"
+		.wl_trial  = 1
+		.wl_trial$ = "TrialNumber"
+		.wl_word   = 3
+		.wl_word$  = "Orthography"
+	elsif .task$ == "GFTA"
+		.wl_trial  = 1
+		.wl_trial$ = "word"
+		.wl_word   = 3
+		.wl_word$  = "ortho"
+	endif
+endproc
+
+# console output for debugging
+procedure log_segmentation_filepaths()
+	if debug_mode
+		appendInfoLine("---- log_segmentation_filepaths() ----")
+		appendInfoLine("input parameters: ")
+		appendInfoLine(tab$, ".drive$: ", segmentation_filepaths.drive$)
+		appendInfoLine(tab$, ".audio_drive$: ", segmentation_filepaths.audio_drive$)
+		appendInfoLine(tab$, ".task$: ", segmentation_filepaths.task$)
+		appendInfoLine(tab$, ".testwave$: ", segmentation_filepaths.testwave$)
+		appendInfoLine(tab$, ".segmenters_initials$: ", segmentation_filepaths.segmenters_initials$)
+		appendInfoLine("")
+		
+		appendInfoLine("derived values: ")
+		appendInfoLine(tab$, ".segmentLog_dir$: ", segmentation_filepaths.segmentLog_dir$)
+		appendInfoLine(tab$, ".textGrid_dir$: ", segmentation_filepaths.textGrid_dir$)
+		appendInfoLine(tab$, ".audio_dir$: ", segmentation_filepaths.audio_dir$)
+		appendInfoLine(tab$, ".wordList_dir$: ", segmentation_filepaths.wordList_dir$)
+		appendInfoLine(tab$, ".audioAnon_dir$: ", segmentation_filepaths.audioAnon_dir$)
+		appendInfoLine(tab$, ".wl_trial: ", segmentation_filepaths.wl_trial)
+		appendInfoLine(tab$, ".wl_trial$: ", segmentation_filepaths.wl_trial$)
+		appendInfoLine(tab$, ".wl_word: ", segmentation_filepaths.wl_word)
+		appendInfoLine(tab$, ".wl_word$: ", segmentation_filepaths.wl_word$)
+		appendInfoLine("")
+	endif
+endproc
+
+
+
+
+# [NODE] Prompt the user to choose the subject's experimental ID.
+procedure startup_id()
+	# Open a dialog box and prompt the user to specify the subject's 3-digit id no.
+	beginPause ("'procedure$' - Initializing session, step 5 (participant ID).")
+		comment ("Please enter the participant's 3-digit ID number in the field below.")
+		word    ("id number", "")
+	button = endPause ("Back", "Quit", "Continue", 3, 1)
+	# Use the 'button' variable to determine which node to transition to next.
+	if button == 1
+		.result_node$ = node_back$
+	elsif button == 2
+		.result_node$ = node_quit$
+	else
+		# If the segmenter wishes to continue to the next step in the
+		# start-up procedure (ie. loading the data files necessary to
+		# segment an audio recording) (button = 3), then transition to
+		# the next node.
+		.id_number$ = id_number$
+		.result_node$ = node_next$
+	endif
+endproc
+
+# console output for debugging
+procedure log_startup_id()
+	if debug_mode
+		appendInfoLine("---- log_startup_id() ----")
+		appendInfoLine("Exit Status: ", startup_id.result_node$)
+		if startup_id.result_node$ == node_next$
+			appendInfoLine(tab$, "derived values: ")
+			appendInfoLine(tab$, ".id_number$: ", startup_id.id_number$)
+		endif
+		appendInfoLine("")
+	endif
+endproc
+
+
+
+
+# [AUDIO FILE]
+procedure startup_load_audio(.audio_dir$, .task$, .id_number$)
+	
+	# Determine which .wav (or .WAV) file in the 'audio_dir$' directory has a filename
+	# that includes the id number of the subject presently being segmented.
+	Create Strings as file list... wavFile '.audio_dir$'/'.task$'_'.id_number$'*.wav
+	n_wavs = Get number of strings
+	
+	# We check to see if the list is empty and if so, whether that's because we're on
+	# a Mac and there is a WAV file instead. 
+	if ('n_wavs' == 0) & (macintosh or unix)
+		select Strings wavFile
+		Remove
+		Create Strings as file list... wavFile '.audio_dir$'/'.task$'_'.id_number$'*.WAV
+		n_wavs = Get number of strings
+	endif
+	
+	# The resulting Strings object 'wavFile' should list exactly one .wav (or .WAV) 
+	# filename that corresponds to the correct audio file for this subject.
+	if (n_wavs > 0)
+		# If the Strings object 'wavFile' has at least one filename,
+		# use the filename in this Strings object to make string
+		# variables for the filename, basename, and filepath of the
+		# audio file on the local filesystem.
+		select Strings wavFile
+		.audio_filename$ = Get string... 1
+		.audio_basename$ = left$(.audio_filename$, length(.audio_filename$) - 4)
+		.audio_filepath$ = "'.audio_dir$'/'.audio_filename$'"
+		# Also make the corresponding experimental_ID$ variable that need later.
+		.experimental_ID$ = mid$(.audio_basename$, length(.task$)+2, length(.audio_basename$))
+		.audio_sound$  = "'.experimental_ID$'_Audio"
+		# Remove the Strings object from the Praat object list.
+		select Strings wavFile
+		Remove
+		# Read in the audio file, and rename it to the value of the
+		# 'audio_sound$' string variable.
+		Read from file... '.audio_filepath$'
+		select Sound '.audio_basename$'
+		Rename... '.audio_sound$'
+		
+		.result_node$ = node_next$
+
+	else
+		# If the Strings object 'wavFile' has no filenames on it,
+		# then the script was unable to find a candidate .wav file.
+		# Display an error message to the segmenter and then
+		# quit this segmentation session.
+		beginPause ("'procedure$' - Initialization error 1. Cannot load audio file.")
+			comment ("There doesn't seem to be an audio file for subject '.id_number$'")
+			comment ("   on the local filesystem.")
+			comment ("Check that the following directory exists on the local filesystem:")
+			comment ("'.audio_dir$'")
+			comment ("Also check that this directory contains a wave file whose basename")
+			comment ("      begins with 'task$'_'id_number$'.")
+		endPause ("Quit segmenting & check filesystem", 1, 1)
+	
+		.result_node$ = node_quit$
+	endif
+endproc
+
+# console output for debugging
+procedure log_load_audio()
+	if debug_mode
+		appendInfoLine("---- log_load_audio() ----")
+		appendInfoLine("Exit Status: ", startup_load_audio.result_node$)
+		if startup_load_audio.result_node$ == node_next$
+			appendInfoLine("input parameters: ")
+			appendInfoLine(tab$, ".audio_dir$: ", startup_load_audio.audio_dir$)
+			appendInfoLine(tab$, ".task$: ", startup_load_audio.task$)
+			appendInfoLine(tab$, ".id_number$: ", startup_load_audio.id_number$)
+			appendInfoLine("")
+			
+			appendInfoLine("derived values: ")
+			appendInfoLine(tab$, ".audio_filename$: ", startup_load_audio.audio_filename$)
+			appendInfoLine(tab$, ".audio_basename$: ", startup_load_audio.audio_basename$)
+			appendInfoLine(tab$, ".audio_filepath$: ", startup_load_audio.audio_filepath$)
+			appendInfoLine(tab$, ".experimental_ID$: ", startup_load_audio.experimental_ID$)
+			appendInfoLine(tab$, ".audio_sound$: ", startup_load_audio.audio_sound$)
+		endif
+		appendInfoLine("")
+	endif
+endproc
+
+
+
+
+# [WORD LIST TABLE]
+procedure startup_wordlist(.task$, .experimental_ID$, .drive$, .wordList_dir$)
+	# Make string variables for the word list table's basename,
+	# filename, and filepath on the local filesystem, using the
+	# 'subject's experimental ID.
+	
+	.wordList_basename$ = "'.task$'_'.experimental_ID$'_WordList"
+	.wordList_filename$ = "'.wordList_basename$'.txt"
+	.wordList_filepath$ = "'.wordList_dir$'/'.wordList_filename$'"
+	.wordList_table$    = "'.experimental_ID$'_WordList"
+	
+	.wordList_exists = fileReadable(.wordList_filepath$)
+	
+	# What we do with this information depends on the task, because ...
+	if .task$ == "GFTA"
+		# If the task is GFTA, there is usually just one file for everyone.
+		if (.wordList_exists == 0)
+			.wordList_basename$ = "GFTA_info"
+			.wordList_filepath$ = "'.drive$'DataAnalysis/GFTA/GFTA_info.txt"
+		endif
+		# But in either case we want the Table Object to be called the same 
+		# thing so we'll reset the wordList_table$ variable.
+		.wordList_table$    =  "gfta_wordlist"
+	endif
+	
+	# Determine again whether a Word List table exists on the local file system.
+	.wordList_exists = fileReadable(.wordList_filepath$)
+	if (.wordList_exists)
+		# Read the word list table from the local filesystem, and then rename
+        # it according to the 'wordList_table$' variable.
+		Read Table from tab-separated file... '.wordList_filepath$'
+		select Table '.wordList_basename$'
+		Rename... '.wordList_table$'
+		
+		# Determine the number of trials (both Familiarization and Test trials) 
+		# in this experimental session.
+		select Table '.wordList_table$'
+		.n_trials = Get number of rows
+		
+		.result_node$ = node_next$
+		
+	else
+		# If there is no Word List table on the local filesystem, first
+		# display an error message to the segmenter and then quit this 
+		# segmentation session.
+		beginPause ("'procedure$' - Initialization error 2. Cannot load word list file.")
+			comment ("There doesn't seem to be a word list table for this subject on the local filesystem.")
+			comment ("Check that the following directory exists on the local filesystem:")
+			comment ("'.wordList_dir$'")
+			comment ("Also check that this directory contains a word list table whose filename is '.task$'_'.experimental_ID$'_WordList.txt.")
+		endPause ("Quit segmenting & check filesystem", 1, 1)
+		
+		.result_node$ = node_quit$
+	endif
+endproc
+
+# console output for debugging
+procedure log_startup_wordlist()
+	if debug_mode
+		appendInfoLine("---- log_startup_wordlist() ----")
+		appendInfoLine("Exit Status: ", startup_wordlist.result_node$)
+		if startup_wordlist.result_node$ != node_quit$
+			appendInfoLine("input parameters: ")
+			appendInfoLine(tab$, ".task$: ", startup_wordlist.task$)
+			appendInfoLine(tab$, ".experimental_ID$: ", startup_wordlist.experimental_ID$)
+			appendInfoLine(tab$, ".wordList_dir$: ", startup_wordlist.wordList_dir$)
+			appendInfoLine("")
+			
+			appendInfoLine("derived values: ")
+			appendInfoLine(tab$, ".wordList_basename$: ", startup_wordlist.wordList_basename$)
+			appendInfoLine(tab$, ".wordList_filename$: ", startup_wordlist.wordList_filename$)
+			appendInfoLine(tab$, ".wordList_filepath$: ", startup_wordlist.wordList_filepath$)
+			appendInfoLine(tab$, ".wordList_table$: ", startup_wordlist.wordList_table$)
+			appendInfoLine(tab$, ".wordList_exists: ", startup_wordlist.wordList_exists)
+			appendInfoLine(tab$, ".n_trials: ", startup_wordlist.n_trials)
+			
+		endif
+		appendInfoLine("")
+	endif
+endproc
+
 
 #===============================================#
-#  End of start-up procedure                                                                            #
+#  End of start-up procedure
 #===============================================#
 
 
 
+
+
+
+
+
+
+
+
+
 #===============================================#
-#  Segmentation procedure                                                                              #
+#  Segmentation procedure
 #===============================================#
 
 # The Segmentation procedure is run only if the Start-Up procedure finished on 
@@ -1601,3 +1761,25 @@ procedure anonymizeInterval
    		endif
    	endwhile
 endproc
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
