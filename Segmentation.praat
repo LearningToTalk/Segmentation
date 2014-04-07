@@ -134,6 +134,11 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 		segmentLog_dir$ = segmentation_filepaths.segmentLog_dir$
 		textGrid_dir$ = segmentation_filepaths.textGrid_dir$
 		wordList_dir$ = segmentation_filepaths.wordList_dir$
+				
+		wl_trial = segmentation_filepaths.wl_trial
+		wl_trial$ = segmentation_filepaths.wl_trial$
+		wl_word = segmentation_filepaths.wl_word
+		wl_word$ = segmentation_filepaths.wl_word$
 		
 		# Prompt for ID
 		@startup_id()
@@ -584,9 +589,6 @@ procedure log_segmentation_filepaths()
 	endif
 endproc
 
-
-
-
 # [NODE] Prompt the user to choose the subject's experimental ID.
 procedure startup_id()
 	# Open a dialog box and prompt the user to specify the subject's 3-digit id no.
@@ -627,20 +629,14 @@ endproc
 
 # [AUDIO FILE]
 procedure startup_load_audio(.audio_dir$, .task$, .id_number$)
+	# Make the pattern to search for
+	.ext$ = if (macintosh or unix) then "WAV" else "wav" endif
+	.audio_pattern$ = .audio_dir$ + "/" + .task$ + "_" + .id_number$ + "*." + .ext$
 	
 	# Determine which .wav (or .WAV) file in the 'audio_dir$' directory has a filename
 	# that includes the id number of the subject presently being segmented.
-	Create Strings as file list... wavFile '.audio_dir$'/'.task$'_'.id_number$'*.wav
+	Create Strings as file list: "wavFile", .audio_pattern$
 	n_wavs = Get number of strings
-	
-	# We check to see if the list is empty and if so, whether that's because we're on
-	# a Mac and there is a WAV file instead. 
-	if ('n_wavs' == 0) & (macintosh or unix)
-		select Strings wavFile
-		Remove
-		Create Strings as file list... wavFile '.audio_dir$'/'.task$'_'.id_number$'*.WAV
-		n_wavs = Get number of strings
-	endif
 	
 	# The resulting Strings object 'wavFile' should list exactly one .wav (or .WAV) 
 	# filename that corresponds to the correct audio file for this subject.
@@ -651,7 +647,7 @@ procedure startup_load_audio(.audio_dir$, .task$, .id_number$)
 		# audio file on the local filesystem.
 		select Strings wavFile
 		.audio_filename$ = Get string... 1
-		.audio_basename$ = left$(.audio_filename$, length(.audio_filename$) - 4)
+		.audio_basename$ = .audio_filename$ - ".wav" - ".WAV"
 		.audio_filepath$ = "'.audio_dir$'/'.audio_filename$'"
 		# Also make the corresponding experimental_ID$ variable that need later.
 		.experimental_ID$ = mid$(.audio_basename$, length(.task$)+2, length(.audio_basename$))
@@ -690,14 +686,18 @@ procedure log_load_audio()
 	if debug_mode
 		appendInfoLine("---- log_load_audio() ----")
 		appendInfoLine("Exit Status: ", startup_load_audio.result_node$)
+		
+		appendInfoLine("input parameters: ")
+		appendInfoLine(tab$, ".audio_dir$: ", startup_load_audio.audio_dir$)
+		appendInfoLine(tab$, ".task$: ", startup_load_audio.task$)
+		appendInfoLine(tab$, ".id_number$: ", startup_load_audio.id_number$)
+		appendInfoLine("")
+		
+		appendInfoLine("derived values: ")
+		appendInfoLine(tab$, ".ext$: ", startup_load_audio.ext$)
+		appendInfoLine(tab$, ".audio_pattern$: ", startup_load_audio.audio_pattern$)
+
 		if startup_load_audio.result_node$ == node_next$
-			appendInfoLine("input parameters: ")
-			appendInfoLine(tab$, ".audio_dir$: ", startup_load_audio.audio_dir$)
-			appendInfoLine(tab$, ".task$: ", startup_load_audio.task$)
-			appendInfoLine(tab$, ".id_number$: ", startup_load_audio.id_number$)
-			appendInfoLine("")
-			
-			appendInfoLine("derived values: ")
 			appendInfoLine(tab$, ".audio_filename$: ", startup_load_audio.audio_filename$)
 			appendInfoLine(tab$, ".audio_basename$: ", startup_load_audio.audio_basename$)
 			appendInfoLine(tab$, ".audio_filepath$: ", startup_load_audio.audio_filepath$)
@@ -772,22 +772,24 @@ procedure log_startup_wordlist()
 	if debug_mode
 		appendInfoLine("---- log_startup_wordlist() ----")
 		appendInfoLine("Exit Status: ", startup_wordlist.result_node$)
+		
+		appendInfoLine("input parameters: ")
+		appendInfoLine(tab$, ".task$: ", startup_wordlist.task$)
+		appendInfoLine(tab$, ".experimental_ID$: ", startup_wordlist.experimental_ID$)
+		appendInfoLine(tab$, ".wordList_dir$: ", startup_wordlist.wordList_dir$)
+		appendInfoLine("")
+		
+		appendInfoLine("derived values: ")
+		appendInfoLine(tab$, ".wordList_basename$: ", startup_wordlist.wordList_basename$)
+		appendInfoLine(tab$, ".wordList_filename$: ", startup_wordlist.wordList_filename$)
+		appendInfoLine(tab$, ".wordList_filepath$: ", startup_wordlist.wordList_filepath$)
+		appendInfoLine(tab$, ".wordList_table$: ", startup_wordlist.wordList_table$)
+		appendInfoLine(tab$, ".wordList_exists: ", startup_wordlist.wordList_exists)
+		
 		if startup_wordlist.result_node$ != node_quit$
-			appendInfoLine("input parameters: ")
-			appendInfoLine(tab$, ".task$: ", startup_wordlist.task$)
-			appendInfoLine(tab$, ".experimental_ID$: ", startup_wordlist.experimental_ID$)
-			appendInfoLine(tab$, ".wordList_dir$: ", startup_wordlist.wordList_dir$)
-			appendInfoLine("")
-			
-			appendInfoLine("derived values: ")
-			appendInfoLine(tab$, ".wordList_basename$: ", startup_wordlist.wordList_basename$)
-			appendInfoLine(tab$, ".wordList_filename$: ", startup_wordlist.wordList_filename$)
-			appendInfoLine(tab$, ".wordList_filepath$: ", startup_wordlist.wordList_filepath$)
-			appendInfoLine(tab$, ".wordList_table$: ", startup_wordlist.wordList_table$)
-			appendInfoLine(tab$, ".wordList_exists: ", startup_wordlist.wordList_exists)
 			appendInfoLine(tab$, ".n_trials: ", startup_wordlist.n_trials)
-			
 		endif
+		
 		appendInfoLine("")
 	endif
 endproc
