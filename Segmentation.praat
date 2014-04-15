@@ -1190,6 +1190,7 @@ if (startup_node$ == startup_node_segment$)
 			 				option ("UnpromptedResponse")
 							option ("VoicePromptResponse")
 							option ("Perseveration")
+							option ("TargetPromptMissing")
 					endif
 					# Prompt the segmenter to choose a standard notes tier label, if appropriate.
 					comment ("(2) [optional] mark any of the following standard notes, if appropriate.") 
