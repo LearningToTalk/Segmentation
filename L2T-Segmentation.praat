@@ -490,11 +490,12 @@ procedure startup_testwave()
 			option ("TimePoint1")
 			option ("TimePoint2")
 			option ("TimePoint3")
-			option ("AdultNorm1")
 			option ("CochlearV1")
 			option ("CochlearV2")
+			option ("AdultNorm1")
 			option ("LateTalker")
 			option ("MaternalEd")
+			option ("DialectDensity")
 			option ("Other")
 	button = endPause ("Back", "Quit", "Continue", 3)
 	
@@ -1847,6 +1848,7 @@ procedure anonymizeInterval
    		endif
    	endwhile
 endproc
+
 
 
 
