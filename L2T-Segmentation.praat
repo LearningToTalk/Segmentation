@@ -130,7 +130,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 		@log_segmentation_filepaths()
 		
 		audio_dir$ = segmentation_filepaths.audio_dir$
-        audioAnon_dir$ = segmentation_filepaths.audioAnon_dir$
+        	audioAnon_dir$ = segmentation_filepaths.audioAnon_dir$
 		segmentLog_dir$ = segmentation_filepaths.segmentLog_dir$
 		textGrid_dir$ = segmentation_filepaths.textGrid_dir$
 		wordList_dir$ = segmentation_filepaths.wordList_dir$
@@ -141,7 +141,7 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 		wl_word$ = segmentation_filepaths.wl_word$
 		
 		# Prompt for ID
-		@startup_id()
+		@startup_id(testwave$)
 		@log_startup_id()
 		
 		@next_back_quit(startup_id.result_node$, startup_node_audio$, startup_node_testwave$, startup_node_quit$)
@@ -150,7 +150,8 @@ while (startup_node$ != startup_node_quit$) and (startup_node$ != startup_node_s
 	# [AUDIO FILE]
 	elsif startup_node$ == startup_node_audio$
 		id_number$ = startup_id.id_number$
-		@startup_load_audio(audio_dir$, task$, id_number$)
+		stim_tp$ = startup_id.stim_tp$
+		@startup_load_audio(audio_dir$, task$, id_number$, stim_tp$)
 		@log_load_audio()
 		
 		@next_back_quit(startup_load_audio.result_node$, startup_node_wordlist$, "", startup_node_quit$)
@@ -411,6 +412,7 @@ procedure startup_initials()
 		# Prompt the user to specify where the script is being run.
 		comment ("Please specify where the machine is on which you are working.")
 			optionMenu ("Location", 1)
+			option ("Default")
 			option ("WaismanLab")
 			option ("ShevlinHallLab")
 			option ("Mac via RDC")
@@ -431,7 +433,12 @@ procedure startup_initials()
 		.location$ = location$
 		
 		# Use the value of the '.location$' variable to set up the 'drive$' variables.
-		if (.location$ == "WaismanLab")
+		if .location$ == "Default"
+		# Default setup. 14 = the string length for "\PraatScripts\"
+			.dirLength = rindex_regex (defaultDirectory$, "/|\\") - 14
+			.drive$ = left$(defaultDirectory$, .dirLength)
+			.audio_drive$ = .drive$
+		elsif (.location$ == "WaismanLab")
 			.drive$ = "L:/"
 			.audio_drive$ = "L:/"
 		elsif (.location$ == "ShevlinHallLab")
@@ -607,11 +614,19 @@ procedure log_segmentation_filepaths()
 endproc
 
 # [NODE] Prompt the user to choose the subject's experimental ID.
-procedure startup_id()
+procedure startup_id(testwave$)
 	# Open a dialog box and prompt the user to specify the subject's 3-digit id no.
 	beginPause ("'procedure$' - Initializing session, step 5 (participant ID).")
 		comment ("Please enter the participant's 3-digit ID number in the field below.")
 		word    ("id number", "")
+		if (testwave$ == "AdultNorm1")
+			comment ("Please choose the timepoint of the stimulus materials")
+			optionMenu ("Stimuli timepoint", 1)
+				option ("2")
+				option ("3")
+		else
+			stimuli_timepoint$ = ""
+		endif
 	button = endPause ("Back", "Quit", "Continue", 3, 1)
 	# Use the 'button' variable to determine which node to transition to next.
 	if button == 1
@@ -624,6 +639,7 @@ procedure startup_id()
 		# segment an audio recording) (button = 3), then transition to
 		# the next node.
 		.id_number$ = id_number$
+		.stim_tp$ = stimuli_timepoint$
 		.result_node$ = node_next$
 	endif
 endproc
@@ -636,6 +652,7 @@ procedure log_startup_id()
 		if startup_id.result_node$ == node_next$
 			appendInfoLine(tab$, "derived values: ")
 			appendInfoLine(tab$, ".id_number$: ", startup_id.id_number$)
+			appendInfoLine(tab$, ".stim_tp$: ", startup_id.stim_tp$)
 		endif
 		appendInfoLine("")
 	endif
@@ -645,15 +662,20 @@ endproc
 
 
 # [AUDIO FILE]
-procedure startup_load_audio(.audio_dir$, .task$, .id_number$)
+procedure startup_load_audio(.audio_dir$, .task$, .id_number$, .stim_tp$)
 	# Make the pattern to search for
 	.ext$ = if (macintosh or unix) then "WAV" else "wav" endif
-	.audio_pattern$ = .audio_dir$ + "/" + .task$ + "_" + .id_number$ + "*." + .ext$
+	.audio_pattern$ = .audio_dir$ + "/" + .task$ + "_" + .id_number$ + "*" + .stim_tp$ + "." + .ext$
 	
 	# Determine which .wav (or .WAV) file in the 'audio_dir$' directory has a filename
 	# that includes the id number of the subject presently being segmented.
 	Create Strings as file list: "wavFile", .audio_pattern$
 	n_wavs = Get number of strings
+	if (n_wavs == 0) & (macintosh or unix)
+		.audio_pattern$ = .audio_pattern$ - "WAV" + "wav"
+		Create Strings as file list: "wavFile", .audio_pattern$
+		n_wavs = Get number of strings
+	endif
 	
 	# The resulting Strings object 'wavFile' should list exactly one .wav (or .WAV) 
 	# filename that corresponds to the correct audio file for this subject.
@@ -1848,7 +1870,3 @@ procedure anonymizeInterval
    		endif
    	endwhile
 endproc
-
-
-
-
