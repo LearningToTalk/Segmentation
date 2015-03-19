@@ -434,8 +434,8 @@ procedure startup_initials()
 		
 		# Use the value of the '.location$' variable to set up the 'drive$' variables.
 		if .location$ == "Default"
-		# Default setup. 14 = the string length for "\PraatScripts\"
-			.dirLength = rindex_regex (defaultDirectory$, "/|\\") - 14
+		# Default setup. 26 = the string length for "DataAnalysis/PraatScripts/"
+			.dirLength = rindex_regex (defaultDirectory$, "/|\\") - 26
 			.drive$ = left$(defaultDirectory$, .dirLength)
 			.audio_drive$ = .drive$
 		elsif (.location$ == "WaismanLab")
